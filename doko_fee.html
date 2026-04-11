@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>同行支援 料金計算</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00897b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="同行支援">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     :root {
       --primary: #00897b;
@@ -1720,6 +1726,8 @@ let segEditingRecordId = null;
 let segEditingIdx = -1;
 let seServiceType = 'taxi';
 let seVtype = 'large';
+let seSegDuration = 0;
+let seHasExtras = false;
 
 function openSegEditModal(recordId, segIdx) {
   const r = records.find(rec => rec.id === recordId);
@@ -1730,6 +1738,15 @@ function openSegEditModal(recordId, segIdx) {
 
   seServiceType = s.serviceType || 'taxi';
   seVtype = s.vtype || 'large';
+  seSegDuration = s.duration || 0;
+
+  // 介助料・ワゴン料が含まれているか判定
+  if (s.serviceType === 'taxi') {
+    const baseFare = calcTaxiFee(seSegDuration, s.vtype || 'large', false).fee;
+    seHasExtras = (s.fee || 0) > baseFare;
+  } else {
+    seHasExtras = false;
+  }
 
   const bt = new Date(s.boardTime);
   const at = new Date(s.alightTime);
@@ -1748,9 +1765,22 @@ function openSegEditModal(recordId, segIdx) {
   document.getElementById('segEditOverlay').classList.add('show');
 }
 
+function seRecalcFee() {
+  let fee = 0;
+  if (seServiceType === 'taxi') {
+    fee = calcTaxiFee(seSegDuration, seVtype, seHasExtras).fee;
+  } else if (seServiceType === 'kyuen') {
+    fee = calcKyuenFee(seSegDuration).fee;
+  } else {
+    fee = calcTaikiFee(seSegDuration).fee;
+  }
+  document.getElementById('se-fee').value = fee;
+}
+
 function seSelectType(t) {
   seServiceType = t;
   seUpdateTypeUI();
+  seRecalcFee();
 }
 
 function seUpdateTypeUI() {
@@ -1766,6 +1796,7 @@ function seUpdateTypeUI() {
 function seSelectVtype(v) {
   seVtype = v;
   seUpdateVtypeUI();
+  seRecalcFee();
 }
 
 function seUpdateVtypeUI() {
@@ -1981,6 +2012,13 @@ function showToast(msg) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js');
+  });
 }
 </script>
 
