@@ -1588,7 +1588,7 @@ function buildRecordCard(r) {
     : (r.place ? `<span class="rec-route">📍 ${escHtml(r.place)}</span>` : '');
 
   let segsHtml = '';
-  if (r.segments && r.segments.length > 1) {
+  if (r.segments && r.segments.length > 0) {
     const rows = r.segments.map((s, i) => {
       const bt   = new Date(s.boardTime);
       const at   = new Date(s.alightTime);
@@ -1602,10 +1602,14 @@ function buildRecordCard(r) {
         ? ((s.departure||s.destination) ? ` ${escHtml(s.departure||'')} → ${escHtml(s.destination||'')}` : '')
         : (s.place ? ` 📍${escHtml(s.place)}` : '');
       const edited = s.feeEdited ? ' ✏️' : '';
-      return `<div class="rec-seg-row">${icon} 区間${i+1} ${bStr}〜${aStr} ${sdStr} ¥${s.fee.toLocaleString()}${edited}${vt ? ' ['+vt+']' : ''}${locS}</div>`;
+      return `<div class="rec-seg-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
+        <span>${icon} 区間${i+1} ${bStr}〜${aStr} ${sdStr} ¥${s.fee.toLocaleString()}${edited}${vt ? ' ['+vt+']' : ''}${locS}</span>
+        <button onclick="openSegEditModal('${r.id}',${i})" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--primary);padding:0 2px;flex-shrink:0;" title="区間を編集">✏️</button>
+      </div>`;
     }).join('');
+    const label = r.segments.length > 1 ? `区間詳細 (${r.segments.length}区間)` : '区間詳細';
     segsHtml = `
-      <span class="rec-segs-toggle" onclick="toggleSegs(this)">▶ 区間詳細 (${r.segments.length}区間)</span>
+      <span class="rec-segs-toggle" onclick="toggleSegs(this)">▶ ${label}</span>
       <div class="rec-segs-detail" style="display:none;">${rows}</div>`;
   }
 
@@ -1711,6 +1715,108 @@ function saveEdit() {
   renderList();
   showToast('✅ 編集を保存しました');
 }
+// ── 区間編集 ──
+let segEditingRecordId = null;
+let segEditingIdx = -1;
+let seServiceType = 'taxi';
+let seVtype = 'large';
+
+function openSegEditModal(recordId, segIdx) {
+  const r = records.find(rec => rec.id === recordId);
+  if (!r || !r.segments || !r.segments[segIdx]) return;
+  segEditingRecordId = recordId;
+  segEditingIdx = segIdx;
+  const s = r.segments[segIdx];
+
+  seServiceType = s.serviceType || 'taxi';
+  seVtype = s.vtype || 'large';
+
+  const bt = new Date(s.boardTime);
+  const at = new Date(s.alightTime);
+  document.getElementById('se-bh').value = bt.getHours();
+  document.getElementById('se-bm').value = bt.getMinutes();
+  document.getElementById('se-ah').value = at.getHours();
+  document.getElementById('se-am').value = at.getMinutes();
+
+  document.getElementById('se-departure').value   = s.departure   || '';
+  document.getElementById('se-destination').value = s.destination || '';
+  document.getElementById('se-place').value        = s.place       || '';
+  document.getElementById('se-fee').value          = s.fee         || 0;
+
+  seUpdateTypeUI();
+  seUpdateVtypeUI();
+  document.getElementById('segEditOverlay').classList.add('show');
+}
+
+function seSelectType(t) {
+  seServiceType = t;
+  seUpdateTypeUI();
+}
+
+function seUpdateTypeUI() {
+  ['taxi','kyuen','taiki'].forEach(t => {
+    document.getElementById('se-btn-'+t).className = 'cs-vtype-btn' + (seServiceType === t ? ' sel' : '');
+  });
+  const isTaxi = seServiceType === 'taxi';
+  document.getElementById('se-vtype-row').style.display  = isTaxi ? 'block' : 'none';
+  document.getElementById('se-route-row').style.display  = isTaxi ? 'block' : 'none';
+  document.getElementById('se-place-row').style.display  = isTaxi ? 'none'  : 'block';
+}
+
+function seSelectVtype(v) {
+  seVtype = v;
+  seUpdateVtypeUI();
+}
+
+function seUpdateVtypeUI() {
+  document.getElementById('se-vtype-large').className = 'cs-vtype-btn' + (seVtype === 'large' ? ' sel' : '');
+  document.getElementById('se-vtype-small').className = 'cs-vtype-btn' + (seVtype === 'small' ? ' sel' : '');
+}
+
+function saveSegEdit() {
+  const r = records.find(rec => rec.id === segEditingRecordId);
+  if (!r || !r.segments || !r.segments[segEditingIdx]) return;
+  const s = r.segments[segEditingIdx];
+
+  const bh = parseInt(document.getElementById('se-bh').value) || 0;
+  const bm = parseInt(document.getElementById('se-bm').value) || 0;
+  const ah = parseInt(document.getElementById('se-ah').value) || 0;
+  const am = parseInt(document.getElementById('se-am').value) || 0;
+
+  const bt = new Date(s.boardTime);
+  bt.setHours(bh, bm, 0, 0);
+  const at = new Date(s.alightTime);
+  at.setHours(ah, am, 0, 0);
+  const duration = Math.max(0, Math.round((at - bt) / 60000));
+
+  s.serviceType = seServiceType;
+  s.vtype       = seServiceType === 'taxi' ? seVtype : null;
+  s.boardTime   = bt.toISOString();
+  s.alightTime  = at.toISOString();
+  s.duration    = duration;
+  s.fee         = parseInt(document.getElementById('se-fee').value) || 0;
+  s.feeEdited   = true;
+
+  if (seServiceType === 'taxi') {
+    s.departure   = document.getElementById('se-departure').value.trim();
+    s.destination = document.getElementById('se-destination').value.trim();
+    s.place = '';
+  } else {
+    s.place       = document.getElementById('se-place').value.trim();
+    s.departure   = '';
+    s.destination = '';
+  }
+
+  // 合計料金・時間を再計算
+  r.fee      = r.segments.reduce((a, seg) => a + seg.fee, 0);
+  r.duration = r.segments.reduce((a, seg) => a + seg.duration, 0);
+
+  persistRecords();
+  document.getElementById('segEditOverlay').classList.remove('show');
+  renderList();
+  showToast('✅ 区間を更新しました');
+}
+
 function clearAllRecords() {
   if (!confirm('すべての記録を削除します。元に戻せません。')) return;
   records = []; persistRecords(); renderList(); showToast('すべての記録を削除しました');
@@ -1877,6 +1983,72 @@ function showToast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 </script>
+
+<!-- 区間編集モーダル -->
+<div class="confirm-overlay" id="segEditOverlay">
+  <div class="confirm-sheet">
+    <div class="cs-handle"></div>
+    <div class="cs-title">✏️ 区間を編集</div>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:6px;display:block;">サービス種別</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="cs-vtype-btn" id="se-btn-taxi"  onclick="seSelectType('taxi')">🚗 福祉タクシー</button>
+        <button class="cs-vtype-btn" id="se-btn-kyuen" onclick="seSelectType('kyuen')">🦮 付添い</button>
+        <button class="cs-vtype-btn" id="se-btn-taiki" onclick="seSelectType('taiki')">⏳ 待機</button>
+      </div>
+    </div>
+
+    <div id="se-vtype-row" style="margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:6px;display:block;">車種</label>
+      <div style="display:flex;gap:8px;">
+        <button class="cs-vtype-btn" id="se-vtype-large" onclick="seSelectVtype('large')">大型（ワゴン）</button>
+        <button class="cs-vtype-btn" id="se-vtype-small" onclick="seSelectVtype('small')">小型</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-bottom:12px;">
+      <div style="flex:1;">
+        <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">乗車時刻</label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="number" id="se-bh" min="0" max="23" style="width:52px;text-align:center;"> 時
+          <input type="number" id="se-bm" min="0" max="59" style="width:52px;text-align:center;"> 分
+        </div>
+      </div>
+      <div style="flex:1;">
+        <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">下車時刻</label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="number" id="se-ah" min="0" max="23" style="width:52px;text-align:center;"> 時
+          <input type="number" id="se-am" min="0" max="59" style="width:52px;text-align:center;"> 分
+        </div>
+      </div>
+    </div>
+
+    <div id="se-route-row" style="margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">移動区間</label>
+      <div class="route-row">
+        <input type="text" id="se-departure" placeholder="出発地">
+        <span class="route-arrow">→</span>
+        <input type="text" id="se-destination" placeholder="目的地">
+      </div>
+    </div>
+    <div id="se-place-row" style="margin-bottom:12px;display:none;">
+      <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">場所</label>
+      <input type="text" id="se-place" placeholder="例：自宅、デニーズ">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">料金</label>
+      <div class="cs-fee-input-wrap"><span class="yen">¥</span><input type="number" id="se-fee" min="0" step="10"></div>
+    </div>
+
+    <button class="cs-confirm-btn" onclick="saveSegEdit()">✅ 保存する</button>
+    <button onclick="document.getElementById('segEditOverlay').classList.remove('show')"
+      style="display:block;width:100%;padding:12px;margin-top:8px;background:none;border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;color:var(--text-sub);">
+      キャンセル
+    </button>
+  </div>
+</div>
 
 <!-- 料金明細書オーバーレイ -->
 <div id="invoiceOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;overflow-y:auto;">
