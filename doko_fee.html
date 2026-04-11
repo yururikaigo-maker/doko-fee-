@@ -1198,9 +1198,13 @@ function updateConfirmBreakdown() {
     const addExtras = isFirstTaxiInSession();
     result = calcTaxiFee(pa.duration, csVtype, addExtras);
   } else if (pa.serviceType === 'kyuen') {
-    result = calcKyuenFee(pa.duration);
+    // 既存の付添い区間の累計＋今回で計算
+    const prevMins = session ? session.segments.filter(s => s.serviceType === 'kyuen').reduce((a, s) => a + s.duration, 0) : 0;
+    result = calcKyuenFee(prevMins + pa.duration);
   } else {
-    result = calcTaikiFee(pa.duration);
+    // 既存の待機区間の累計＋今回で計算
+    const prevMins = session ? session.segments.filter(s => s.serviceType === 'taiki').reduce((a, s) => a + s.duration, 0) : 0;
+    result = calcTaikiFee(prevMins + pa.duration);
   }
 
   const bdHtml = result.breakdown.map(l =>
@@ -1335,6 +1339,16 @@ function completeSession() {
     // 内訳メモを更新
     seg.lastTaxiExtras = true;
   }
+
+  // ── 付添い・待機は合算時間で料金を再計算し最終区間にまとめる ──
+  ['kyuen', 'taiki'].forEach(type => {
+    const typeSegs = session.segments.filter(s => s.serviceType === type);
+    if (typeSegs.length === 0) return;
+    const totalMins = typeSegs.reduce((a, s) => a + s.duration, 0);
+    const totalFee  = type === 'kyuen' ? calcKyuenFee(totalMins).fee : calcTaikiFee(totalMins).fee;
+    typeSegs.forEach(s => s.fee = 0);
+    typeSegs[typeSegs.length - 1].fee = totalFee;
+  });
 
   const totalDuration = session.segments.reduce((a, s) => a + s.duration, 0);
   const totalFee      = session.segments.reduce((a, s) => a + s.fee, 0);
@@ -1610,7 +1624,10 @@ function buildRecordCard(r) {
       const edited = s.feeEdited ? ' ✏️' : '';
       return `<div class="rec-seg-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
         <span>${icon} 区間${i+1} ${bStr}〜${aStr} ${sdStr} ¥${s.fee.toLocaleString()}${edited}${vt ? ' ['+vt+']' : ''}${locS}</span>
-        <button onclick="openSegEditModal('${r.id}',${i})" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--primary);padding:0 2px;flex-shrink:0;" title="区間を編集">✏️</button>
+        <span style="display:flex;gap:2px;flex-shrink:0;">
+          <button onclick="openSegEditModal('${r.id}',${i})" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--primary);padding:0 2px;" title="区間を編集">✏️</button>
+          <button onclick="deleteSegment('${r.id}',${i})" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--danger);padding:0 2px;" title="区間を削除">🗑️</button>
+        </span>
       </div>`;
     }).join('');
     const label = r.segments.length > 1 ? `区間詳細 (${r.segments.length}区間)` : '区間詳細';
@@ -1846,6 +1863,26 @@ function saveSegEdit() {
   document.getElementById('segEditOverlay').classList.remove('show');
   renderList();
   showToast('✅ 区間を更新しました');
+}
+
+function deleteSegment(recordId, segIdx) {
+  const r = records.find(rec => rec.id === recordId);
+  if (!r || !r.segments) return;
+  if (r.segments.length <= 1) {
+    if (!confirm('区間が1つしかないため、記録ごと削除されます。よろしいですか？')) return;
+    records = records.filter(rec => rec.id !== recordId);
+    persistRecords();
+    renderList();
+    showToast('🗑️ 記録を削除しました');
+    return;
+  }
+  if (!confirm(`区間${segIdx + 1}を削除しますか？`)) return;
+  r.segments.splice(segIdx, 1);
+  r.fee      = r.segments.reduce((a, s) => a + s.fee, 0);
+  r.duration = r.segments.reduce((a, s) => a + s.duration, 0);
+  persistRecords();
+  renderList();
+  showToast('🗑️ 区間を削除しました');
 }
 
 function clearAllRecords() {
