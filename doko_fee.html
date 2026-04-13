@@ -1138,7 +1138,7 @@ function startSession() {
   };
   rpServiceType = setupServiceType;
 
-  document.getElementById('rp-customer').textContent = customer;
+  document.getElementById('rp-customer').textContent = customer + ' 様';
   document.getElementById('rp-staff').textContent    = session.staff ? '担当：' + session.staff : '';
   rpUpdateTotalFee();
   rpSelectStype(rpServiceType);
