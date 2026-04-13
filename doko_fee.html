@@ -170,11 +170,33 @@
       font-size: 13px; font-weight: 700; color: var(--text-sub);
       margin-bottom: 10px; letter-spacing: .5px;
     }
-    .board-time-info { font-size: 14px; font-weight: 700; color: var(--alight-color); margin-bottom: 6px; }
+    .board-time-info { font-size: 14px; font-weight: 700; color: var(--alight-color); margin-bottom: 10px; }
+    /* タクシーメーター */
+    .taxi-meter {
+      background: #1a1a2e;
+      border-radius: 14px;
+      padding: 18px 16px 14px;
+      margin-bottom: 14px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,.35);
+    }
+    .meter-label {
+      color: #9e9e9e; font-size: 10px; letter-spacing: 2px;
+      text-transform: uppercase; margin-bottom: 4px;
+    }
+    .meter-fee {
+      font-size: 50px; font-weight: 900; color: #00e676;
+      letter-spacing: -2px; font-variant-numeric: tabular-nums;
+      line-height: 1; margin-bottom: 10px;
+    }
+    .meter-time-row {
+      display: flex; justify-content: center; align-items: baseline; gap: 6px;
+      border-top: 1px solid #2e2e4e; padding-top: 8px;
+    }
+    .meter-time-label { color: #9e9e9e; font-size: 11px; }
     .elapsed-display {
-      font-size: 52px; font-weight: 800; letter-spacing: -2px;
-      color: var(--alight-color); line-height: 1.1; margin-bottom: 16px;
-      font-variant-numeric: tabular-nums;
+      font-size: 26px; font-weight: 800; color: #e0e0e0;
+      font-variant-numeric: tabular-nums; letter-spacing: -1px;
     }
 
     /* recording phase: service type row */
@@ -283,6 +305,16 @@
     /* dest row */
     .cs-dest-row { margin-bottom: 16px; }
     .cs-dest-row label { font-size: 12px; font-weight: 700; color: var(--text-sub); margin-bottom: 5px; }
+
+    /* passenger count row */
+    .pax-row { margin-bottom: 14px; }
+    .pax-row > label { font-size: 12px; font-weight: 700; color: var(--text-sub); margin-bottom: 6px; display: block; }
+    .pax-row-inner { display: flex; gap: 12px; }
+    .pax-col { flex: 1; text-align: center; }
+    .pax-col > label { font-size: 12px; font-weight: 700; color: var(--text-sub); margin-bottom: 5px; display: block; }
+    .pax-col input { text-align: center; font-size: 22px; font-weight: 800; color: var(--primary-dark); }
+    .pax-total-label { font-size: 12px; font-weight: 700; color: var(--text-sub); margin-bottom: 5px; }
+    .pax-total-val { font-size: 22px; font-weight: 800; color: var(--primary-dark); padding: 10px 0; }
 
     .cs-confirm-btn {
       background: var(--primary); color: white;
@@ -510,6 +542,34 @@
           <label>担当スタッフ名</label>
           <input type="text" id="staffName" placeholder="例：鈴木 花子">
         </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>乗車人数</label>
+          <div style="display:flex;gap:16px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;font-weight:700;color:var(--text-sub);">男性</span>
+              <button type="button" onclick="changePax('paxMale',-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:#f5f5f5;font-size:16px;cursor:pointer;">－</button>
+              <span id="paxMaleVal" style="font-size:18px;font-weight:800;min-width:24px;text-align:center;">0</span>
+              <button type="button" onclick="changePax('paxMale',1)"  style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:#f5f5f5;font-size:16px;cursor:pointer;">＋</button>
+              <span style="font-size:12px;color:var(--text-sub);">名</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;font-weight:700;color:var(--text-sub);">女性</span>
+              <button type="button" onclick="changePax('paxFemale',-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:#f5f5f5;font-size:16px;cursor:pointer;">－</button>
+              <span id="paxFemaleVal" style="font-size:18px;font-weight:800;min-width:24px;text-align:center;">0</span>
+              <button type="button" onclick="changePax('paxFemale',1)"  style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:#f5f5f5;font-size:16px;cursor:pointer;">＋</button>
+              <span style="font-size:12px;color:var(--text-sub);">名</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:14px;margin-bottom:0;">
+          <label>障害者割引</label>
+          <button type="button" id="btn-disability" onclick="toggleDisabilityDiscount()"
+            style="width:100%;padding:11px 14px;border-radius:8px;border:2px solid var(--border);
+            background:white;font-size:14px;font-weight:700;cursor:pointer;color:var(--text-sub);
+            text-align:left;transition:background .15s,border-color .15s,color .15s;">
+            ♿ 障害者割引　なし
+          </button>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">&#128221; メモ・備考（任意）</div>
@@ -545,6 +605,18 @@
             <button class="rp-stype-btn" id="rp-btn-kyuen" onclick="rpSelectStype('kyuen')">&#129761; 付添い</button>
             <button class="rp-stype-btn" id="rp-btn-taiki" onclick="rpSelectStype('taiki')">&#9203; 待機</button>
           </div>
+          <!-- 車種選択（タクシー時のみ） -->
+          <div id="rp-vtype-row" style="display:none;margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:6px;display:block;">車種</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <button type="button" class="cs-vtype-btn" id="rp-vtype-large" onclick="rpSelectVtype('large')">
+                <span class="icon">&#128656;</span>大型（ワゴン）
+              </button>
+              <button type="button" class="cs-vtype-btn" id="rp-vtype-small" onclick="rpSelectVtype('small')">
+                <span class="icon">&#128663;</span>小型
+              </button>
+            </div>
+          </div>
           <div class="dep-row">
             <label id="rp-dep-label" style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">出発地（任意）</label>
             <input type="text" id="rp-departure" placeholder="出発地（任意）">
@@ -560,7 +632,15 @@
         <!-- 乗車中状態 -->
         <div id="state-riding" style="display:none;">
           <div class="board-time-info" id="rp-boardInfo">乗車: 09:15</div>
-          <div class="elapsed-display" id="rp-elapsed">00:00</div>
+          <!-- タクシーメーター -->
+          <div class="taxi-meter">
+            <div class="meter-label" id="rp-meter-label">現在の料金（目安）</div>
+            <div class="meter-fee" id="rp-meter-fee">¥0</div>
+            <div class="meter-time-row">
+              <span class="meter-time-label">経過時間</span>
+              <span class="elapsed-display" id="rp-elapsed">00:00</span>
+            </div>
+          </div>
           <button class="btn btn-alight" onclick="doAlightTime()">&#128689;&#65039; 下車する</button>
         </div>
       </div>
@@ -652,6 +732,19 @@
               <span class="time-colon">:</span>
               <select id="m-alightM" onchange="mAutoCalc()"></select>
             </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#128101; 乗車人数</div>
+        <div class="pax-row-inner">
+          <div class="pax-col">
+            <label>男性（人）</label>
+            <input type="number" id="m-paxMale" min="0" value="1">
+          </div>
+          <div class="pax-col">
+            <label>女性（人）</label>
+            <input type="number" id="m-paxFemale" min="0" value="0">
           </div>
         </div>
       </div>
@@ -805,8 +898,17 @@
       </div>
     </div>
 
+    <!-- 有料道路料金（タクシーのみ） -->
+    <div id="cs-toll-row" style="display:none;margin-top:10px;">
+      <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">🛣️ 有料道路料金（ETCなど）</label>
+      <div class="cs-fee-input-wrap">
+        <span class="yen">¥</span>
+        <input type="number" id="cs-tollFee" min="0" step="10" value="0" placeholder="0">
+      </div>
+    </div>
+
     <!-- 目的地 / 場所 -->
-    <div class="cs-dest-row">
+    <div class="cs-dest-row" style="margin-top:10px;">
       <label id="cs-dest-label">目的地（任意）</label>
       <input type="text" id="cs-destination" placeholder="目的地を入力">
     </div>
@@ -886,7 +988,11 @@ let pendingAlight    = null;
 // pendingAlight = { serviceType, departure, boardTime, alightTime, duration }
 
 let csVtype          = 'large'; // vehicle type selected in confirm sheet
+let rpVtype          = 'large'; // vehicle type pre-selected in recording phase
 let feeManuallyEdited = false;  // user overrode the calculated fee
+let setupPaxMale     = 0;       // session-level male passengers
+let setupPaxFemale   = 0;       // session-level female passengers
+let setupDisabilityDiscount = false; // 障害者割引フラグ
 
 let elapsedTimer = null;
 let clockTimer   = null;
@@ -1022,10 +1128,13 @@ function startSession() {
 
   session = {
     customer,
-    staff:     document.getElementById('staffName').value.trim(),
-    memo:      document.getElementById('setupMemo').value.trim(),
-    startedAt: new Date().toISOString(),
-    segments:  [],
+    staff:              document.getElementById('staffName').value.trim(),
+    memo:               document.getElementById('setupMemo').value.trim(),
+    startedAt:          new Date().toISOString(),
+    paxMale:            setupPaxMale,
+    paxFemale:          setupPaxFemale,
+    disabilityDiscount: setupDisabilityDiscount,
+    segments:           [],
   };
   rpServiceType = setupServiceType;
 
@@ -1053,6 +1162,9 @@ function rpSelectStype(type) {
   // 出発地（タクシー）↔ 場所（救援・待機）切り替え
   document.getElementById('rp-departure').closest('.dep-row').style.display = isTaxi ? '' : 'none';
   document.getElementById('rp-place-row').style.display = isTaxi ? 'none' : '';
+  // 車種選択行（タクシー時のみ）
+  document.getElementById('rp-vtype-row').style.display = isTaxi ? 'block' : 'none';
+  if (isTaxi) rpUpdateVtypeUI();
 
   // ボタンラベル
   if (type === 'taiki') {
@@ -1111,8 +1223,32 @@ function doBoardTime() {
 
 function updateElapsed() {
   if (!currentRide) return;
-  const diff = Math.floor((Date.now() - currentRide.boardTime) / 1000);
-  document.getElementById('rp-elapsed').textContent = pad(Math.floor(diff / 60)) + ':' + pad(diff % 60);
+  const diffSec = Math.floor((Date.now() - currentRide.boardTime) / 1000);
+  const diffMin = Math.max(1, Math.floor(diffSec / 60));
+  document.getElementById('rp-elapsed').textContent = pad(Math.floor(diffSec / 60)) + ':' + pad(diffSec % 60);
+
+  // リアルタイム料金表示
+  const meterFeeEl    = document.getElementById('rp-meter-fee');
+  const meterLabelEl  = document.getElementById('rp-meter-label');
+  if (!meterFeeEl) return;
+  let liveFee = 0;
+  if (rpServiceType === 'taxi') {
+    meterLabelEl.textContent = '現在の料金（目安）';
+    meterFeeEl.style.color   = '#00e676'; // 緑
+    liveFee = calcTaxiFee(diffMin, rpVtype, isFirstTaxiInSession()).fee;
+    if (session && session.disabilityDiscount) liveFee = Math.floor(liveFee * 0.9);
+  } else if (rpServiceType === 'kyuen') {
+    meterLabelEl.textContent = '付添い料（目安・累計）';
+    meterFeeEl.style.color   = '#ce93d8'; // 紫
+    const prevMins = session ? session.segments.filter(s => s.serviceType === 'kyuen').reduce((a, s) => a + s.duration, 0) : 0;
+    liveFee = calcKyuenFee(prevMins + diffMin).fee;
+  } else {
+    meterLabelEl.textContent = '待機料（目安・累計）';
+    meterFeeEl.style.color   = '#ffb74d'; // オレンジ
+    const prevMins = session ? session.segments.filter(s => s.serviceType === 'taiki').reduce((a, s) => a + s.duration, 0) : 0;
+    liveFee = calcTaikiFee(prevMins + diffMin).fee;
+  }
+  meterFeeEl.textContent = '¥' + liveFee.toLocaleString();
 }
 
 function doAlightTime() {
@@ -1156,7 +1292,7 @@ function openConfirmSheet() {
   const isTaxi = pa.serviceType === 'taxi';
   if (isTaxi) {
     vtypeSec.style.display = 'block';
-    csVtype = settings.defaultVtype || 'large';
+    csVtype = rpVtype; // 記録画面で選んだ車種を引き継ぐ
     csSelectVtype(csVtype);
   } else {
     vtypeSec.style.display = 'none';
@@ -1177,8 +1313,47 @@ function openConfirmSheet() {
     destInput.value = pa.place || '';
   }
 
+  // 有料道路・乗車人数の初期化
+  document.getElementById('cs-toll-row').style.display = isTaxi ? 'block' : 'none';
+  document.getElementById('cs-tollFee').value = 0;
   feeManuallyEdited = false;
   document.getElementById('confirmOverlay').classList.add('show');
+}
+
+function changePax(field, delta) {
+  if (field === 'paxMale') {
+    setupPaxMale = Math.max(0, setupPaxMale + delta);
+    document.getElementById('paxMaleVal').textContent = setupPaxMale;
+  } else {
+    setupPaxFemale = Math.max(0, setupPaxFemale + delta);
+    document.getElementById('paxFemaleVal').textContent = setupPaxFemale;
+  }
+}
+
+function rpSelectVtype(vtype) {
+  rpVtype = vtype;
+  rpUpdateVtypeUI();
+}
+
+function rpUpdateVtypeUI() {
+  document.getElementById('rp-vtype-large').className = 'cs-vtype-btn' + (rpVtype === 'large' ? ' sel' : '');
+  document.getElementById('rp-vtype-small').className = 'cs-vtype-btn' + (rpVtype === 'small' ? ' sel' : '');
+}
+
+function toggleDisabilityDiscount() {
+  setupDisabilityDiscount = !setupDisabilityDiscount;
+  const btn = document.getElementById('btn-disability');
+  if (setupDisabilityDiscount) {
+    btn.textContent = '♿ 障害者割引　あり（タクシー料金 1割引）';
+    btn.style.background = '#e8f5e9';
+    btn.style.borderColor = '#2e7d32';
+    btn.style.color = '#1b5e20';
+  } else {
+    btn.textContent = '♿ 障害者割引　なし';
+    btn.style.background = 'white';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--text-sub)';
+  }
 }
 
 function csSelectVtype(vtype) {
@@ -1197,6 +1372,15 @@ function updateConfirmBreakdown() {
     // 初回タクシーなら介助料・ワゴン料を加算（最終回は完了時に再計算）
     const addExtras = isFirstTaxiInSession();
     result = calcTaxiFee(pa.duration, csVtype, addExtras);
+    // 障害者割引（タクシー料金1割引）
+    if (session && session.disabilityDiscount) {
+      const discountAmt = Math.floor(result.fee * 0.1);
+      result = {
+        ...result,
+        fee: result.fee - discountAmt,
+        breakdown: [...result.breakdown, `♿ 障害者割引 (−10%)　−¥${discountAmt.toLocaleString()}`]
+      };
+    }
   } else if (pa.serviceType === 'kyuen') {
     // 既存の付添い区間の累計＋今回で計算
     const prevMins = session ? session.segments.filter(s => s.serviceType === 'kyuen').reduce((a, s) => a + s.duration, 0) : 0;
@@ -1230,7 +1414,8 @@ function confirmAlight() {
   const feeInput = parseInt(document.getElementById('cs-feeInput').value) || 0;
   const dest     = document.getElementById('cs-destination').value.trim();
 
-  const isTaxi = pa.serviceType === 'taxi';
+  const isTaxi  = pa.serviceType === 'taxi';
+  const tollFee = isTaxi ? (parseInt(document.getElementById('cs-tollFee').value) || 0) : 0;
   const seg = {
     serviceType: pa.serviceType,
     vtype:       isTaxi ? csVtype : null,
@@ -1241,6 +1426,9 @@ function confirmAlight() {
     alightTime:  pa.alightTime.toISOString(),
     duration:    pa.duration,
     fee:         feeInput,
+    tollFee:     tollFee,
+    paxMale:     csPaxMale,
+    paxFemale:   csPaxFemale,
     calcFee:     pa._calcFee || 0,
     feeEdited:   feeManuallyEdited,
   };
@@ -1334,6 +1522,8 @@ function completeSession() {
     const isLarge = seg.vtype === 'large';
     let extras = 1000; // 介助料
     if (isLarge) extras += 1000; // ワゴン料
+    // 障害者割引が有効なら1割引
+    if (session.disabilityDiscount) extras = Math.floor(extras * 0.9);
     seg.fee += extras;
     seg.extrasAdded = extras;
     // 内訳メモを更新
@@ -1351,7 +1541,7 @@ function completeSession() {
   });
 
   const totalDuration = session.segments.reduce((a, s) => a + s.duration, 0);
-  const totalFee      = session.segments.reduce((a, s) => a + s.fee, 0);
+  const totalFee      = session.segments.reduce((a, s) => a + s.fee + (s.tollFee || 0), 0);
   const firstSeg = session.segments[0];
   const lastSeg  = session.segments[session.segments.length - 1];
   const taxiSegs  = session.segments.filter(s => s.serviceType === 'taxi').length;
@@ -1371,8 +1561,11 @@ function completeSession() {
     duration:    totalDuration,
     fee:         totalFee,
     memo:        session.memo,
-    segments:    session.segments,
-    isMultiStop: true,
+    paxMale:            session.paxMale   || 0,
+    paxFemale:          session.paxFemale || 0,
+    disabilityDiscount: session.disabilityDiscount || false,
+    segments:           session.segments,
+    isMultiStop:        true,
   };
 
   records.unshift(record);
@@ -1395,6 +1588,16 @@ function endSession() {
   session = null; currentRide = null; pendingAlight = null;
   rpServiceType = 'taxi'; setupServiceType = null;
 
+  setupPaxMale = 0; setupPaxFemale = 0;
+  document.getElementById('paxMaleVal').textContent   = '0';
+  document.getElementById('paxFemaleVal').textContent = '0';
+  rpVtype = 'large';
+  setupDisabilityDiscount = false;
+  const btnDis = document.getElementById('btn-disability');
+  btnDis.textContent = '♿ 障害者割引　なし';
+  btnDis.style.background = 'white';
+  btnDis.style.borderColor = 'var(--border)';
+  btnDis.style.color = 'var(--text-sub)';
   document.getElementById('customerName').value = '';
   document.getElementById('staffName').value    = '';
   document.getElementById('setupMemo').value    = '';
@@ -1530,6 +1733,8 @@ function mDoSave() {
     alightTime:  ad.toISOString(),
     duration:    r.duration,
     fee:         r.fee,
+    paxMale:     parseInt(document.getElementById('m-paxMale').value)   || 0,
+    paxFemale:   parseInt(document.getElementById('m-paxFemale').value) || 0,
   };
   const record = {
     id: Date.now().toString(),
@@ -1621,9 +1826,12 @@ function buildRecordCard(r) {
       const locS  = s.serviceType === 'taxi'
         ? ((s.departure||s.destination) ? ` ${escHtml(s.departure||'')} → ${escHtml(s.destination||'')}` : '')
         : (s.place ? ` 📍${escHtml(s.place)}` : '');
-      const edited = s.feeEdited ? ' ✏️' : '';
+      const edited   = s.feeEdited ? ' ✏️' : '';
+      const tollStr  = s.tollFee ? ` 🛣️¥${s.tollFee.toLocaleString()}` : '';
+      const totalPax = (s.paxMale||0) + (s.paxFemale||0);
+      const paxStr   = totalPax > 0 ? ` 👤男${s.paxMale||0}・女${s.paxFemale||0}名` : '';
       return `<div class="rec-seg-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
-        <span>${icon} 区間${i+1} ${bStr}〜${aStr} ${sdStr} ¥${s.fee.toLocaleString()}${edited}${vt ? ' ['+vt+']' : ''}${locS}</span>
+        <span>${icon} 区間${i+1} ${bStr}〜${aStr} ${sdStr} ¥${s.fee.toLocaleString()}${edited}${vt ? ' ['+vt+']' : ''}${locS}${tollStr}${paxStr}</span>
         <span style="display:flex;gap:2px;flex-shrink:0;">
           <button onclick="openSegEditModal('${r.id}',${i})" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--primary);padding:0 2px;" title="区間を編集">✏️</button>
           <button onclick="deleteSegment('${r.id}',${i})" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--danger);padding:0 2px;" title="区間を削除">🗑️</button>
@@ -1659,6 +1867,7 @@ function buildRecordCard(r) {
       <div class="rec-bottom">
         <span>⏱ ${dStr}</span>
         ${r.staff ? `<span>👤 ${escHtml(r.staff)}</span>` : ''}
+        ${((r.paxMale||0)+(r.paxFemale||0)) > 0 ? `<span>🧍男${r.paxMale||0}・女${r.paxFemale||0}名</span>` : ''}
         ${r.savedAt ? `<span>${r.savedAt.slice(11,16)}</span>` : ''}
       </div>
       ${segsHtml}
@@ -1776,7 +1985,6 @@ function openSegEditModal(recordId, segIdx) {
   document.getElementById('se-destination').value = s.destination || '';
   document.getElementById('se-place').value        = s.place       || '';
   document.getElementById('se-fee').value          = s.fee         || 0;
-
   seUpdateTypeUI();
   seUpdateVtypeUI();
   document.getElementById('segEditOverlay').classList.add('show');
@@ -1842,7 +2050,7 @@ function saveSegEdit() {
   s.boardTime   = bt.toISOString();
   s.alightTime  = at.toISOString();
   s.duration    = duration;
-  s.fee         = parseInt(document.getElementById('se-fee').value) || 0;
+  s.fee         = parseInt(document.getElementById('se-fee').value)       || 0;
   s.feeEdited   = true;
 
   if (seServiceType === 'taxi') {
@@ -1927,22 +2135,27 @@ function printInvoice(id) {
     const extras = s.extrasAdded ? `<br><span style="font-size:11px;color:#555;">（介助料${s.vtype==='large'?'・ワゴン料':''}含む）</span>` : '';
     const firstNote = (i === 0 && s.serviceType === 'taxi') ? `<br><span style="font-size:11px;color:#555;">（介助料${s.vtype==='large'?'・ワゴン料':''}含む）</span>` : '';
 
+    const tollNote = s.tollFee ? `<br><span style="font-size:11px;color:#555;">🛣️ 有料道路 ¥${s.tollFee.toLocaleString()}</span>` : '';
+    const totalPax = (s.paxMale||0) + (s.paxFemale||0);
+    const paxNote  = totalPax > 0 ? `<br><span style="font-size:11px;color:#555;">👤 男性${s.paxMale||0}名・女性${s.paxFemale||0}名</span>` : '';
+    const segTotal = s.fee + (s.tollFee || 0);
+
     return `
       <tr>
         <td style="padding:9px 10px;border-bottom:1px solid #eee;font-size:14px;">${i+1}</td>
         <td style="padding:9px 10px;border-bottom:1px solid #eee;font-size:14px;">
-          ${label}${firstNote}${extras && i > 0 ? extras : ''}
+          ${label}${firstNote}${extras && i > 0 ? extras : ''}${tollNote}${paxNote}
           ${locDetail ? `<br><span style="font-size:12px;color:#777;">📍 ${escHtml(locDetail)}</span>` : ''}
         </td>
         <td style="padding:9px 10px;border-bottom:1px solid #eee;font-size:14px;white-space:nowrap;">${bStr}〜${aStr}<br><span style="font-size:12px;color:#777;">${dStr}</span></td>
-        <td style="padding:9px 10px;border-bottom:1px solid #eee;font-size:14px;text-align:right;font-weight:700;">¥${s.fee.toLocaleString()}</td>
+        <td style="padding:9px 10px;border-bottom:1px solid #eee;font-size:14px;text-align:right;font-weight:700;">¥${segTotal.toLocaleString()}</td>
       </tr>`;
   }).join('');
 
-  // 種別ごと合計
-  const taxiFee  = segs.filter(s => s.serviceType === 'taxi').reduce((a, s) => a + s.fee, 0);
-  const kyuenFee = segs.filter(s => s.serviceType === 'kyuen').reduce((a, s) => a + s.fee, 0);
-  const taikiFee = segs.filter(s => s.serviceType === 'taiki').reduce((a, s) => a + s.fee, 0);
+  // 種別ごと合計（有料道路含む）
+  const taxiFee  = segs.filter(s => s.serviceType === 'taxi').reduce((a, s) => a + s.fee + (s.tollFee||0), 0);
+  const kyuenFee = segs.filter(s => s.serviceType === 'kyuen').reduce((a, s) => a + s.fee + (s.tollFee||0), 0);
+  const taikiFee = segs.filter(s => s.serviceType === 'taiki').reduce((a, s) => a + s.fee + (s.tollFee||0), 0);
 
   const summaryRows = [
     taxiFee  > 0 ? `<tr><td style="padding:8px 12px;font-size:14px;">福祉タクシー</td><td style="padding:8px 12px;font-size:14px;text-align:right;font-weight:700;">¥${taxiFee.toLocaleString()}</td></tr>` : '',
