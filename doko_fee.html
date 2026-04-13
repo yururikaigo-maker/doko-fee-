@@ -505,6 +505,9 @@
   <button class="tab-btn" onclick="switchTab('list')" id="tab-list">
     <span class="icon">&#128203;</span>記録一覧
   </button>
+  <button class="tab-btn" onclick="switchTab('odo')" id="tab-odo">
+    <span class="icon">&#128663;</span>出退庫
+  </button>
   <button class="tab-btn" onclick="switchTab('settings')" id="tab-settings">
     <span class="icon">&#9881;&#65039;</span>設定
   </button>
@@ -800,6 +803,88 @@
 <!-- ═══════════════════════
      TAB: 設定
 ═══════════════════════ -->
+<!-- ═══════════════════════
+     TAB: 出退庫
+═══════════════════════ -->
+<div class="tab-panel" id="panel-odo">
+  <div class="content">
+
+    <!-- 今日の状態 -->
+    <div class="card" id="odo-today-card">
+      <div class="card-title">&#128197; 本日の記録</div>
+      <div id="odo-today-status"></div>
+    </div>
+
+    <!-- 出庫ボタン -->
+    <div id="odo-depart-block">
+      <div class="card">
+        <div class="card-title">&#128663; 出庫記録</div>
+        <div class="form-group">
+          <label>出庫時刻</label>
+          <input type="time" id="odo-depart-time" style="font-size:22px;font-weight:700;padding:12px;">
+        </div>
+        <div class="form-group">
+          <label>メーター（km）</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" id="odo-depart-km" placeholder="例：12345" min="0"
+              style="flex:1;font-size:22px;font-weight:700;padding:12px;">
+            <button type="button" onclick="startOcr('depart')"
+              style="flex-shrink:0;padding:12px 14px;font-size:22px;border:1.5px solid var(--border);
+                     border-radius:8px;background:white;cursor:pointer;" title="写真で読み取る">
+              📷
+            </button>
+          </div>
+          <div id="odo-depart-preview" style="display:none;margin-top:8px;"></div>
+        </div>
+        <div class="form-group">
+          <label>担当スタッフ</label>
+          <select id="odo-depart-staff">
+            <option value="">（選択）</option>
+            <option value="熊木志津乃">熊木志津乃</option>
+            <option value="井上美季子">井上美季子</option>
+            <option value="熊木伸一">熊木伸一</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="saveDepart()" style="width:100%;font-size:16px;padding:14px;">
+          &#128663; 出庫を記録する
+        </button>
+      </div>
+    </div>
+
+    <!-- 入庫ボタン -->
+    <div id="odo-arrive-block" style="display:none;">
+      <div class="card">
+        <div class="card-title">&#127968; 入庫記録</div>
+        <div class="form-group">
+          <label>入庫時刻</label>
+          <input type="time" id="odo-arrive-time" style="font-size:22px;font-weight:700;padding:12px;">
+        </div>
+        <div class="form-group">
+          <label>メーター（km）</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" id="odo-arrive-km" placeholder="例：12389" min="0"
+              style="flex:1;font-size:22px;font-weight:700;padding:12px;">
+            <button type="button" onclick="startOcr('arrive')"
+              style="flex-shrink:0;padding:12px 14px;font-size:22px;border:1.5px solid var(--border);
+                     border-radius:8px;background:white;cursor:pointer;" title="写真で読み取る">
+              📷
+            </button>
+          </div>
+          <div id="odo-arrive-preview" style="display:none;margin-top:8px;"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveArrive()" style="width:100%;font-size:16px;padding:14px;background:#c62828;">
+          &#127968; 入庫を記録する
+        </button>
+      </div>
+    </div>
+
+    <!-- 過去の記録 -->
+    <div class="card-title" style="margin-top:8px;">&#128337; 過去の出退庫記録</div>
+    <div id="odo-history"></div>
+
+  </div>
+</div>
+
 <div class="tab-panel" id="panel-settings">
   <div class="content">
 
@@ -862,11 +947,74 @@
     </div>
 
     <div class="card">
+      <div class="card-title">&#128190; データエクスポート</div>
+      <p style="font-size:13px;color:var(--text-sub);margin-bottom:12px;">
+        今日の記録をJSONファイルとしてダウンロードします。日報アプリで読み込んで集計できます。
+      </p>
+      <button class="btn btn-primary" onclick="exportTodayRecords()">&#128229; 今日の記録をエクスポート</button>
+      <button class="btn btn-primary" onclick="exportAllRecords()" style="margin-top:8px;background:#546e7a;">&#128229; すべての記録をエクスポート</button>
+    </div>
+
+    <div class="card">
       <div class="card-title">&#9888;&#65039; データ管理</div>
       <p style="font-size:13px;color:var(--text-sub);margin-bottom:12px;">
         記録はこのブラウザのローカルストレージに保存されています。削除すると元に戻せません。
       </p>
       <button class="btn btn-danger" onclick="clearAllRecords()">&#128465;&#65039; すべての記録を削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- hidden camera input -->
+<input type="file" id="ocrFileInput" accept="image/*" capture="environment"
+  style="display:none;" onchange="onOcrPhoto(event)">
+
+<!-- ══════════════════════════════
+     メーターOCRモーダル
+══════════════════════════════ -->
+<div id="ocrOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:16px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4);">
+    <div style="background:#00695c;color:white;padding:14px 18px;font-size:15px;font-weight:800;">
+      📷 メーター読み取り
+    </div>
+    <div style="padding:16px;">
+      <!-- 写真プレビュー -->
+      <div style="text-align:center;margin-bottom:14px;">
+        <img id="ocrPreviewImg" src="" alt="メーター写真"
+          style="max-width:100%;max-height:220px;border-radius:10px;border:2px solid #e0e0e0;">
+      </div>
+      <!-- 状態メッセージ -->
+      <div id="ocrStatus" style="text-align:center;font-size:14px;color:#757575;margin-bottom:12px;">
+        読み取り中...
+      </div>
+      <!-- 認識結果 -->
+      <div id="ocrResultArea" style="display:none;">
+        <label style="font-size:12px;font-weight:700;color:#757575;display:block;margin-bottom:6px;">
+          認識されたメーター値（修正できます）
+        </label>
+        <input type="number" id="ocrResultInput" min="0"
+          style="width:100%;font-size:28px;font-weight:800;color:#00695c;
+                 padding:12px;border:2px solid #00897b;border-radius:10px;text-align:center;">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;padding:0 16px 16px;">
+      <button onclick="closeOcrModal()" id="ocrCancelBtn"
+        style="flex:1;padding:12px;border:1.5px solid #e0e0e0;border-radius:10px;
+               background:white;font-size:14px;font-weight:700;cursor:pointer;">
+        キャンセル
+      </button>
+      <button onclick="retakePhoto()"
+        style="flex:1;padding:12px;border:1.5px solid #e0e0e0;border-radius:10px;
+               background:#f5f5f5;font-size:14px;font-weight:700;cursor:pointer;">
+        📷 撮り直す
+      </button>
+      <button onclick="applyOcrResult()" id="ocrApplyBtn" disabled
+        style="flex:1;padding:12px;border:none;border-radius:10px;
+               background:#00897b;color:white;font-size:14px;font-weight:700;cursor:pointer;
+               opacity:0.5;">
+        ✅ 使用する
+      </button>
     </div>
   </div>
 </div>
@@ -1019,6 +1167,8 @@ let rpServiceType = 'taxi';
 let mServiceType = null;
 let mVtype       = 'large';
 
+let odoRecords = []; // [{date, staff, departTime, departKm, arriveTime, arriveKm, km}]
+
 // ══════════════════════════════════════
 //  Init
 // ══════════════════════════════════════
@@ -1028,6 +1178,7 @@ let mVtype       = 'large';
   mSetDefaultTime();
   renderSettingsUI();
   renderList();
+  renderOdoTab();
 })();
 
 function loadData() {
@@ -1036,10 +1187,246 @@ function loadData() {
     if (s) settings = Object.assign({ defaultVtype: 'large' }, JSON.parse(s));
     const r = localStorage.getItem('doko_records');
     if (r) records = JSON.parse(r);
+    const o = localStorage.getItem('doko_odo');
+    if (o) odoRecords = JSON.parse(o);
   } catch(e) {}
 }
 function persistSettings() { localStorage.setItem('doko_settings', JSON.stringify(settings)); }
 function persistRecords()  { localStorage.setItem('doko_records',  JSON.stringify(records));  }
+function persistOdo()      { localStorage.setItem('doko_odo',      JSON.stringify(odoRecords)); }
+
+// ══════════════════════════════════════
+//  出退庫
+// ══════════════════════════════════════
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function nowTimeStr() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function renderOdoTab() {
+  const today = todayStr();
+  const rec = odoRecords.find(r => r.date === today);
+
+  const statusEl       = document.getElementById('odo-today-status');
+  const departBlock    = document.getElementById('odo-depart-block');
+  const arriveBlock    = document.getElementById('odo-arrive-block');
+
+  if (!rec) {
+    // 出庫未記録
+    statusEl.innerHTML = `<p style="color:var(--text-sub);font-size:13px;">まだ記録がありません</p>`;
+    document.getElementById('odo-depart-time').value = nowTimeStr();
+    document.getElementById('odo-depart-km').value = '';
+    departBlock.style.display = 'block';
+    arriveBlock.style.display = 'none';
+  } else if (!rec.arriveTime) {
+    // 出庫済・入庫未
+    statusEl.innerHTML = `
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div><div style="font-size:11px;color:var(--text-sub);font-weight:700;">出庫時刻</div>
+          <div style="font-size:20px;font-weight:800;color:#2e7d32;">🚗 ${rec.departTime}</div>
+          <div style="font-size:13px;color:var(--text-sub);">メーター ${rec.departKm.toLocaleString()} km</div>
+        </div>
+        <div><div style="font-size:11px;color:var(--text-sub);font-weight:700;">入庫</div>
+          <div style="font-size:16px;color:#b00;font-weight:700;">未記録</div>
+        </div>
+      </div>`;
+    document.getElementById('odo-arrive-time').value = nowTimeStr();
+    document.getElementById('odo-arrive-km').value = '';
+    departBlock.style.display = 'none';
+    arriveBlock.style.display = 'block';
+  } else {
+    // 完了
+    const km = rec.arriveKm - rec.departKm;
+    statusEl.innerHTML = `
+      <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;">
+        <div><div style="font-size:11px;color:var(--text-sub);font-weight:700;">出庫</div>
+          <div style="font-size:18px;font-weight:800;color:#2e7d32;">🚗 ${rec.departTime}</div>
+          <div style="font-size:12px;color:var(--text-sub);">${rec.departKm.toLocaleString()} km</div>
+        </div>
+        <div><div style="font-size:11px;color:var(--text-sub);font-weight:700;">入庫</div>
+          <div style="font-size:18px;font-weight:800;color:#b71c1c;">🏠 ${rec.arriveTime}</div>
+          <div style="font-size:12px;color:var(--text-sub);">${rec.arriveKm.toLocaleString()} km</div>
+        </div>
+        <div style="background:var(--primary-light);border-radius:10px;padding:10px 16px;text-align:center;">
+          <div style="font-size:11px;color:var(--primary-dark);font-weight:700;">本日走行</div>
+          <div style="font-size:26px;font-weight:800;color:var(--primary-dark);">${km.toLocaleString()} km</div>
+        </div>
+      </div>`;
+    departBlock.style.display = 'none';
+    arriveBlock.style.display = 'none';
+  }
+
+  // 過去の記録（直近10件）
+  const histEl = document.getElementById('odo-history');
+  const past = [...odoRecords].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 14);
+  if (past.length === 0) {
+    histEl.innerHTML = `<p style="color:var(--text-sub);font-size:13px;padding:8px 0;">記録はありません</p>`;
+    return;
+  }
+  histEl.innerHTML = past.map(r => {
+    const km = (r.arriveKm && r.departKm) ? r.arriveKm - r.departKm : null;
+    const d = new Date(r.date + 'T00:00:00');
+    const dow = '日月火水木金土'[d.getDay()];
+    const dateLabel = `${d.getMonth()+1}/${d.getDate()}（${dow}）`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;
+      padding:11px 14px;background:white;border-radius:10px;margin-bottom:8px;
+      box-shadow:var(--shadow);font-size:13px;">
+      <div>
+        <div style="font-weight:700;">${dateLabel}${r.staff ? '　' + r.staff : ''}</div>
+        <div style="color:var(--text-sub);margin-top:2px;">
+          🚗 ${r.departTime || '—'} (${r.departKm ? r.departKm.toLocaleString() : '—'} km)
+          　🏠 ${r.arriveTime || '未記録'} (${r.arriveKm ? r.arriveKm.toLocaleString() : '—'} km)
+        </div>
+      </div>
+      <div style="font-size:18px;font-weight:800;color:var(--primary-dark);white-space:nowrap;margin-left:12px;">
+        ${km !== null ? km.toLocaleString() + ' km' : '—'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveDepart() {
+  const time  = document.getElementById('odo-depart-time').value;
+  const km    = parseInt(document.getElementById('odo-depart-km').value);
+  const staff = document.getElementById('odo-depart-staff').value;
+  if (!time) { showToast('出庫時刻を入力してください'); return; }
+  if (isNaN(km) || km < 0) { showToast('メーターの数値を入力してください'); return; }
+  const today = todayStr();
+  odoRecords = odoRecords.filter(r => r.date !== today);
+  odoRecords.unshift({ date: today, staff, departTime: time, departKm: km, arriveTime: null, arriveKm: null });
+  persistOdo();
+  renderOdoTab();
+  showToast('✅ 出庫を記録しました');
+}
+
+function saveArrive() {
+  const time = document.getElementById('odo-arrive-time').value;
+  const km   = parseInt(document.getElementById('odo-arrive-km').value);
+  if (!time) { showToast('入庫時刻を入力してください'); return; }
+  if (isNaN(km) || km < 0) { showToast('メーターの数値を入力してください'); return; }
+  const today = todayStr();
+  const rec = odoRecords.find(r => r.date === today);
+  if (!rec) { showToast('出庫が記録されていません'); return; }
+  if (km < rec.departKm) { showToast('入庫メーターが出庫より小さい値です'); return; }
+  rec.arriveTime = time;
+  rec.arriveKm   = km;
+  persistOdo();
+  renderOdoTab();
+  showToast(`✅ 入庫を記録しました（本日 ${km - rec.departKm} km）`);
+}
+
+// ══════════════════════════════════════
+//  メーターOCR
+// ══════════════════════════════════════
+let ocrTarget = null; // 'depart' | 'arrive'
+
+function startOcr(target) {
+  ocrTarget = target;
+  document.getElementById('ocrFileInput').value = '';
+  document.getElementById('ocrFileInput').click();
+}
+
+function retakePhoto() {
+  document.getElementById('ocrFileInput').value = '';
+  document.getElementById('ocrFileInput').click();
+}
+
+function onOcrPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // モーダルを表示
+  const overlay = document.getElementById('ocrOverlay');
+  overlay.style.display = 'flex';
+  document.getElementById('ocrStatus').textContent = '読み取り中... しばらくお待ちください';
+  document.getElementById('ocrResultArea').style.display = 'none';
+  document.getElementById('ocrApplyBtn').disabled = true;
+  document.getElementById('ocrApplyBtn').style.opacity = '0.5';
+
+  // 写真をプレビュー表示
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('ocrPreviewImg').src = e.target.result;
+    runOcr(e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+function runOcr(dataUrl) {
+  // Tesseract.js を CDN から遅延ロード
+  if (typeof Tesseract === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    script.onload = () => doOcr(dataUrl);
+    script.onerror = () => {
+      document.getElementById('ocrStatus').textContent =
+        '⚠️ オフライン環境では使用できません。手入力してください。';
+      showOcrManualFallback();
+    };
+    document.head.appendChild(script);
+  } else {
+    doOcr(dataUrl);
+  }
+}
+
+async function doOcr(dataUrl) {
+  try {
+    const worker = await Tesseract.createWorker('eng');
+    await worker.setParameters({
+      tessedit_char_whitelist: '0123456789',
+      tessedit_pageseg_mode: '7', // 単一行として処理
+    });
+    const { data: { text } } = await worker.recognize(dataUrl);
+    await worker.terminate();
+
+    // 数字だけ抽出（スペース・改行除去）
+    const digits = text.replace(/\D/g, '');
+    const num = parseInt(digits, 10);
+
+    if (!isNaN(num) && num > 0) {
+      document.getElementById('ocrStatus').textContent = '✅ 読み取り完了。数値を確認してください。';
+      document.getElementById('ocrResultInput').value = num;
+      document.getElementById('ocrResultArea').style.display = 'block';
+      document.getElementById('ocrApplyBtn').disabled = false;
+      document.getElementById('ocrApplyBtn').style.opacity = '1';
+    } else {
+      document.getElementById('ocrStatus').textContent =
+        '⚠️ 数字を認識できませんでした。撮り直すか手入力してください。';
+      showOcrManualFallback();
+    }
+  } catch(e) {
+    document.getElementById('ocrStatus').textContent =
+      '⚠️ 読み取りに失敗しました。撮り直すか手入力してください。';
+    showOcrManualFallback();
+  }
+}
+
+function showOcrManualFallback() {
+  document.getElementById('ocrResultInput').value = '';
+  document.getElementById('ocrResultArea').style.display = 'block';
+  document.getElementById('ocrApplyBtn').disabled = false;
+  document.getElementById('ocrApplyBtn').style.opacity = '1';
+}
+
+function applyOcrResult() {
+  const val = document.getElementById('ocrResultInput').value;
+  if (!val) { showToast('数値を入力してください'); return; }
+  const inputId = ocrTarget === 'depart' ? 'odo-depart-km' : 'odo-arrive-km';
+  document.getElementById(inputId).value = val;
+  closeOcrModal();
+  showToast(`✅ メーター値を入力しました：${parseInt(val).toLocaleString()} km`);
+}
+
+function closeOcrModal() {
+  document.getElementById('ocrOverlay').style.display = 'none';
+  document.getElementById('ocrPreviewImg').src = '';
+  ocrTarget = null;
+}
 
 // ══════════════════════════════════════
 //  Fare Calculation
@@ -1126,6 +1513,7 @@ function switchTab(tab) {
   document.getElementById('panel-' + tab).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'list') renderList();
+  if (tab === 'odo')  renderOdoTab();
 }
 
 // ══════════════════════════════════════
@@ -2113,6 +2501,53 @@ function deleteSegment(recordId, segIdx) {
 function clearAllRecords() {
   if (!confirm('すべての記録を削除します。元に戻せません。')) return;
   records = []; persistRecords(); renderList(); showToast('すべての記録を削除しました');
+}
+
+function buildExportData(filteredRecords, filteredOdo) {
+  return { records: filteredRecords, odoRecords: filteredOdo };
+}
+
+function exportTodayRecords() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const tStr = `${yyyy}-${mm}-${dd}`;
+  const todayRecords = records.filter(r => r.savedAt && r.savedAt.slice(0, 10) === tStr);
+  const todayOdo     = odoRecords.filter(r => r.date === tStr);
+  if (todayRecords.length === 0 && todayOdo.length === 0) {
+    showToast('今日の記録がありません');
+    return;
+  }
+  const data = buildExportData(todayRecords, todayOdo);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `doko_records_${tStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✅ ${todayRecords.length}件をエクスポートしました`);
+}
+
+function exportAllRecords() {
+  if (records.length === 0 && odoRecords.length === 0) {
+    showToast('記録がありません');
+    return;
+  }
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const data = buildExportData(records, odoRecords);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `doko_records_all_${yyyy}${mm}${dd}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✅ ${records.length}件をエクスポートしました`);
 }
 
 // ══════════════════════════════════════
