@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>同行支援 料金計算</title>
+  <title>サービス料金計算</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#00897b">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="同行支援">
+  <meta name="apple-mobile-web-app-title" content="サービス料金計算">
   <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     :root {
@@ -494,7 +494,7 @@
 <body>
 
 <header class="app-header">
-  <h1>&#128657; 同行支援 料金計算</h1>
+  <h1>&#128657; サービス料金計算</h1>
   <p>福祉タクシー ／ 付添い ／ 待機</p>
 </header>
 
@@ -540,7 +540,12 @@
         </div>
         <div class="form-group">
           <label>担当スタッフ名</label>
-          <input type="text" id="staffName" placeholder="例：鈴木 花子">
+          <select id="staffName">
+            <option value="">（選択してください）</option>
+            <option value="熊木志津乃">熊木志津乃</option>
+            <option value="井上美季子">井上美季子</option>
+            <option value="熊木伸一">熊木伸一</option>
+          </select>
         </div>
         <div class="form-group" style="margin-bottom:0;">
           <label>乗車人数</label>
@@ -697,7 +702,12 @@
         </div>
         <div class="form-group">
           <label>担当スタッフ名</label>
-          <input type="text" id="m-staffName" placeholder="例：鈴木 花子">
+          <select id="m-staffName">
+            <option value="">（選択してください）</option>
+            <option value="熊木志津乃">熊木志津乃</option>
+            <option value="井上美季子">井上美季子</option>
+            <option value="熊木伸一">熊木伸一</option>
+          </select>
         </div>
       </div>
       <!-- タクシー：出発地→目的地 -->
@@ -931,7 +941,12 @@
     </div>
     <div style="margin-bottom:12px;">
       <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">担当スタッフ</label>
-      <input type="text" id="ed-staff" placeholder="担当スタッフ名">
+      <select id="ed-staff">
+        <option value="">（選択してください）</option>
+        <option value="熊木志津乃">熊木志津乃</option>
+        <option value="井上美季子">井上美季子</option>
+        <option value="熊木伸一">熊木伸一</option>
+      </select>
     </div>
 
     <!-- 場所 / 移動区間（種別により切り替え） -->
@@ -1043,12 +1058,12 @@ function calcTaxiFee(minutes, vtype, addExtras) {
 
   // 運賃
   let fare = baseFare;
-  lines.push(`初乗り運賃（〜10分）¥${baseFare.toLocaleString()}`);
+  lines.push(`初乗り運賃（10分00秒まで）¥${baseFare.toLocaleString()}`);
   if (minutes > 10) {
     const extra = Math.ceil((minutes - 10) / 5);
     const add   = extra * addUnit;
     fare += add;
-    lines.push(`加算 ${extra}回 × ¥${addUnit.toLocaleString()} = ¥${add.toLocaleString()}`);
+    lines.push(`加算 ${extra}回 × ¥${addUnit.toLocaleString()}（5分00秒超ごと）= ¥${add.toLocaleString()}`);
   }
 
   let extras = 0;
@@ -1224,7 +1239,7 @@ function doBoardTime() {
 function updateElapsed() {
   if (!currentRide) return;
   const diffSec = Math.floor((Date.now() - currentRide.boardTime) / 1000);
-  const diffMin = Math.max(1, Math.floor(diffSec / 60));
+  const diffMin = Math.max(1, Math.ceil(diffSec / 60));
   document.getElementById('rp-elapsed').textContent = pad(Math.floor(diffSec / 60)) + ':' + pad(diffSec % 60);
 
   // リアルタイム料金表示
@@ -1256,7 +1271,7 @@ function doAlightTime() {
   clearInterval(elapsedTimer); elapsedTimer = null;
 
   const now      = new Date();
-  const duration = Math.max(1, Math.round((now - currentRide.boardTime) / 60000));
+  const duration = Math.max(1, Math.ceil((now - currentRide.boardTime) / 60000));
 
   pendingAlight = {
     serviceType: currentRide.serviceType,
@@ -1599,7 +1614,7 @@ function endSession() {
   btnDis.style.borderColor = 'var(--border)';
   btnDis.style.color = 'var(--text-sub)';
   document.getElementById('customerName').value = '';
-  document.getElementById('staffName').value    = '';
+  document.getElementById('staffName').value = '';
   document.getElementById('setupMemo').value    = '';
   document.getElementById('rp-departure').value = '';
   document.getElementById('btn-taxi').className  = 'stype-btn';
