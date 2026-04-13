@@ -1,4 +1,4 @@
-const CACHE = 'doko-fee-v1';
+const CACHE = 'doko-fee-v2';
 const FILES = [
   './doko_fee.html',
   './manifest.json',
