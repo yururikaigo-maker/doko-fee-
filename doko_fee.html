@@ -648,6 +648,10 @@
               <span class="meter-time-label">経過時間</span>
               <span class="elapsed-display" id="rp-elapsed">00:00</span>
             </div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.12);display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:#aaa;">途中経過合計（記録済）</span>
+              <span id="rp-running-total" style="font-size:15px;font-weight:800;color:#ffe082;">¥0</span>
+            </div>
           </div>
           <button class="btn btn-alight" onclick="doAlightTime()">&#128689;&#65039; 下車する</button>
         </div>
@@ -1447,12 +1451,12 @@ function calcTaxiFee(minutes, vtype, addExtras) {
 
   // 運賃
   let fare = baseFare;
-  lines.push(`初乗り運賃（10分00秒まで）¥${baseFare.toLocaleString()}`);
+  lines.push(`初乗り運賃（〜10分）¥${baseFare.toLocaleString()}`);
   if (minutes > 10) {
     const extra = Math.ceil((minutes - 10) / 5);
     const add   = extra * addUnit;
     fare += add;
-    lines.push(`加算 ${extra}回 × ¥${addUnit.toLocaleString()}（5分00秒超ごと）= ¥${add.toLocaleString()}`);
+    lines.push(`加算 ${extra}回 × ¥${addUnit.toLocaleString()}（5分ごと）= ¥${add.toLocaleString()}`);
   }
 
   let extras = 0;
@@ -1629,8 +1633,15 @@ function doBoardTime() {
 function updateElapsed() {
   if (!currentRide) return;
   const diffSec = Math.floor((Date.now() - currentRide.boardTime) / 1000);
-  const diffMin = Math.max(1, Math.ceil(diffSec / 60));
-  document.getElementById('rp-elapsed').textContent = pad(Math.floor(diffSec / 60)) + ':' + pad(diffSec % 60);
+  const diffMin = Math.max(1, Math.floor(diffSec / 60));
+  if (rpServiceType === 'kyuen' || rpServiceType === 'taiki') {
+    // 付添い・待機は5分刻みで表示
+    const elapsedRawMin = Math.floor(diffSec / 60);
+    const bracket = Math.floor(elapsedRawMin / 5) * 5 + 5;
+    document.getElementById('rp-elapsed').textContent = bracket + '分未満';
+  } else {
+    document.getElementById('rp-elapsed').textContent = pad(Math.floor(diffSec / 60)) + ':' + pad(diffSec % 60);
+  }
 
   // リアルタイム料金表示
   const meterFeeEl    = document.getElementById('rp-meter-fee');
@@ -1640,8 +1651,12 @@ function updateElapsed() {
   if (rpServiceType === 'taxi') {
     meterLabelEl.textContent = '現在の料金（目安）';
     meterFeeEl.style.color   = '#00e676'; // 緑
-    liveFee = calcTaxiFee(diffMin, rpVtype, isFirstTaxiInSession()).fee;
-    if (session && session.disabilityDiscount) liveFee = Math.floor(liveFee * 0.9);
+    const calcR = calcTaxiFee(diffMin, rpVtype, isFirstTaxiInSession());
+    if (session && session.disabilityDiscount) {
+      liveFee = Math.floor(calcR.farePart * 0.9 / 10) * 10 + calcR.extrasPart;
+    } else {
+      liveFee = calcR.fee;
+    }
   } else if (rpServiceType === 'kyuen') {
     meterLabelEl.textContent = '付添い料（目安・累計）';
     meterFeeEl.style.color   = '#ce93d8'; // 紫
@@ -1661,7 +1676,7 @@ function doAlightTime() {
   clearInterval(elapsedTimer); elapsedTimer = null;
 
   const now      = new Date();
-  const duration = Math.max(1, Math.ceil((now - currentRide.boardTime) / 60000));
+  const duration = Math.max(1, Math.floor((now - currentRide.boardTime) / 60000));
 
   pendingAlight = {
     serviceType: currentRide.serviceType,
@@ -1777,13 +1792,15 @@ function updateConfirmBreakdown() {
     // 初回タクシーなら介助料・ワゴン料を加算（最終回は完了時に再計算）
     const addExtras = isFirstTaxiInSession();
     result = calcTaxiFee(pa.duration, csVtype, addExtras);
-    // 障害者割引（タクシー料金1割引）
+    // 障害者割引（運賃のみ1割引、1桁切り捨て。介助料・ワゴン料は対象外）
     if (session && session.disabilityDiscount) {
-      const discountAmt = Math.floor(result.fee * 0.1);
+      const discountedFare = Math.floor(result.farePart * 0.9 / 10) * 10;
+      const discountAmt    = result.farePart - discountedFare;
       result = {
         ...result,
-        fee: result.fee - discountAmt,
-        breakdown: [...result.breakdown, `♿ 障害者割引 (−10%)　−¥${discountAmt.toLocaleString()}`]
+        fee:      discountedFare + result.extrasPart,
+        farePart: discountedFare,
+        breakdown: [...result.breakdown, `♿ 障害者割引 運賃のみ−10%　−¥${discountAmt.toLocaleString()}`]
       };
     }
   } else if (pa.serviceType === 'kyuen') {
@@ -1862,6 +1879,8 @@ function rpUpdateTotalFee() {
   if (!session) return;
   const total = session.segments.reduce((a, s) => a + s.fee, 0);
   document.getElementById('rp-totalFee').textContent = '¥' + total.toLocaleString();
+  const rt = document.getElementById('rp-running-total');
+  if (rt) rt.textContent = '¥' + total.toLocaleString();
 }
 
 function renderSegments() {
@@ -1927,8 +1946,7 @@ function completeSession() {
     const isLarge = seg.vtype === 'large';
     let extras = 1000; // 介助料
     if (isLarge) extras += 1000; // ワゴン料
-    // 障害者割引が有効なら1割引
-    if (session.disabilityDiscount) extras = Math.floor(extras * 0.9);
+    // 介助料・ワゴン料は障害者割引対象外
     seg.fee += extras;
     seg.extrasAdded = extras;
     // 内訳メモを更新
