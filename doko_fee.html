@@ -1858,7 +1858,7 @@ function updateConfirmBreakdown() {
     // 初回タクシーなら介助料・ワゴン料を加算（最終回は完了時に再計算）
     const addExtras = isFirstTaxiInSession();
     result = calcTaxiFee(pa.duration, csVtype, addExtras);
-    // 障害者割引（運賃のみ1割引、1桁切り捨て。介助料・ワゴン料は対象外）
+    // 障害者割引（運賃のみ1割引、10円未満切り捨て。介助料・ワゴン料は対象外）
     if (session && session.disabilityDiscount) {
       const discountedFare = Math.floor(result.farePart * 0.9 / 10) * 10;
       const discountAmt    = result.farePart - discountedFare;
@@ -1956,7 +1956,17 @@ function renderSegments() {
   }
   document.getElementById('segments-area').style.display = 'block';
 
-  const html = session.segments.map((seg, i) => {
+  const insertBtn = (afterIdx) =>
+    `<button onclick="openRpSegInsert(${afterIdx})"
+      style="display:block;width:100%;padding:4px;margin:4px 0;font-size:12px;font-weight:700;
+      color:var(--primary);background:var(--primary-light);border:1.5px dashed var(--primary);
+      border-radius:8px;cursor:pointer;text-align:center;">➕ ここに区間を挿入</button>`;
+
+  const parts = [];
+  // 先頭の挿入ボタン
+  parts.push(insertBtn(-1));
+
+  session.segments.forEach((seg, i) => {
     const bt   = new Date(seg.boardTime);
     const at   = new Date(seg.alightTime);
     const bStr = pad(bt.getHours()) + ':' + pad(bt.getMinutes());
@@ -1971,10 +1981,14 @@ function renderSegments() {
       ? (seg.departure || seg.destination ? escHtml((seg.departure||'') + ' → ' + (seg.destination||'')) : '')
       : (seg.place ? '📍 ' + escHtml(seg.place) : '');
     const edited = seg.feeEdited ? ' ✏️' : '';
-    return `
+    parts.push(`
       <div class="seg-card">
-        <button class="seg-del" onclick="deleteSeg(${i})">&#128465;&#65039;</button>
-        <div class="seg-top">
+        <div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;">
+          <button style="background:none;border:none;font-size:14px;cursor:pointer;padding:2px 4px;"
+            onclick="openRpSegEdit(${i})" title="編集">✏️</button>
+          <button class="seg-del" onclick="deleteSeg(${i})" title="削除">&#128465;&#65039;</button>
+        </div>
+        <div class="seg-top" style="padding-right:60px;">
           <div class="seg-left">
             <span class="seg-num">区間 ${i+1}</span>
             <span class="badge ${bClass}">${bLabel}${vtypeStr ? ' ' + vtypeStr : ''}</span>
@@ -1983,9 +1997,12 @@ function renderSegments() {
         </div>
         <div class="seg-times">${bStr} &#8594; ${aStr}</div>
         <div class="seg-meta">${dStr}${locStr ? '　' + locStr : ''}</div>
-      </div>`;
-  }).join('');
-  document.getElementById('segments-list').innerHTML = html;
+      </div>`);
+    // 各区間の後ろに挿入ボタン
+    parts.push(insertBtn(i));
+  });
+
+  document.getElementById('segments-list').innerHTML = parts.join('');
 }
 
 function deleteSeg(i) {
@@ -2303,7 +2320,17 @@ function buildRecordCard(r) {
 
   let segsHtml = '';
   if (r.segments && r.segments.length > 0) {
-    const rows = r.segments.map((s, i) => {
+    const insBtn = (afterIdx) =>
+      `<div style="text-align:center;margin:2px 0;">
+        <button onclick="openSegInsert('${r.id}',${afterIdx})"
+          style="font-size:11px;color:var(--primary);background:var(--primary-light);
+          border:1px dashed var(--primary);border-radius:6px;padding:2px 10px;cursor:pointer;">
+          ➕ ここに挿入
+        </button>
+      </div>`;
+
+    const rowParts = [insBtn(-1)];
+    r.segments.forEach((s, i) => {
       const bt   = new Date(s.boardTime);
       const at   = new Date(s.alightTime);
       const bStr = pad(bt.getHours()) + ':' + pad(bt.getMinutes());
@@ -2319,18 +2346,19 @@ function buildRecordCard(r) {
       const tollStr  = s.tollFee ? ` 🛣️¥${s.tollFee.toLocaleString()}` : '';
       const totalPax = (s.paxMale||0) + (s.paxFemale||0);
       const paxStr   = totalPax > 0 ? ` 👤男${s.paxMale||0}・女${s.paxFemale||0}名` : '';
-      return `<div class="rec-seg-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
+      rowParts.push(`<div class="rec-seg-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
         <span>${icon} 区間${i+1} ${bStr}〜${aStr} ${sdStr} ¥${s.fee.toLocaleString()}${edited}${vt ? ' ['+vt+']' : ''}${locS}${tollStr}${paxStr}</span>
         <span style="display:flex;gap:2px;flex-shrink:0;">
           <button onclick="openSegEditModal('${r.id}',${i})" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--primary);padding:0 2px;" title="区間を編集">✏️</button>
           <button onclick="deleteSegment('${r.id}',${i})" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--danger);padding:0 2px;" title="区間を削除">🗑️</button>
         </span>
-      </div>`;
-    }).join('');
+      </div>`);
+      rowParts.push(insBtn(i));
+    });
     const label = r.segments.length > 1 ? `区間詳細 (${r.segments.length}区間)` : '区間詳細';
     segsHtml = `
       <span class="rec-segs-toggle" onclick="toggleSegs(this)">▶ ${label}</span>
-      <div class="rec-segs-detail" style="display:none;">${rows}</div>`;
+      <div class="rec-segs-detail" style="display:none;">${rowParts.join('')}</div>`;
   }
 
   const memoHtml = r.memo
@@ -2438,48 +2466,117 @@ function saveEdit() {
 }
 // ── 区間編集 ──
 let segEditingRecordId = null;
-let segEditingIdx = -1;
+let segEditingIdx      = -1;
+let segInsertAfterIdx  = -1;
+let segEditDateRef     = null;
+// 'edit_record'|'insert_record'|'edit_session'|'insert_session'
+let segEditMode        = 'edit_record';
 let seServiceType = 'taxi';
-let seVtype = 'large';
+let seVtype       = 'large';
 let seSegDuration = 0;
-let seHasExtras = false;
+let seHasExtras   = false;
 
-function openSegEditModal(recordId, segIdx) {
-  const r = records.find(rec => rec.id === recordId);
-  if (!r || !r.segments || !r.segments[segIdx]) return;
-  segEditingRecordId = recordId;
-  segEditingIdx = segIdx;
-  const s = r.segments[segIdx];
-
-  seServiceType = s.serviceType || 'taxi';
-  seVtype = s.vtype || 'large';
-  seSegDuration = s.duration || 0;
-
-  // 介助料・ワゴン料が含まれているか判定
-  if (s.serviceType === 'taxi') {
-    const baseFare = calcTaxiFee(seSegDuration, s.vtype || 'large', false).fee;
-    seHasExtras = (s.fee || 0) > baseFare;
-  } else {
-    seHasExtras = false;
-  }
-
-  const bt = new Date(s.boardTime);
-  const at = new Date(s.alightTime);
-  document.getElementById('se-bh').value = bt.getHours();
-  document.getElementById('se-bm').value = bt.getMinutes();
-  document.getElementById('se-ah').value = at.getHours();
-  document.getElementById('se-am').value = at.getMinutes();
-
-  document.getElementById('se-departure').value   = s.departure   || '';
-  document.getElementById('se-destination').value = s.destination || '';
-  document.getElementById('se-place').value        = s.place       || '';
-  document.getElementById('se-fee').value          = s.fee         || 0;
-  seUpdateTypeUI();
-  seUpdateVtypeUI();
+// ── 共通モーダル表示ヘルパー ──
+function seShowModal(title, hint, bh, bm, ah, am, stype, vtype, dep, dest, place, fee) {
+  document.getElementById('se-modal-title').textContent = title;
+  const hintEl = document.getElementById('se-insert-hint');
+  if (hint) { hintEl.textContent = hint; hintEl.style.display = 'block'; }
+  else      { hintEl.style.display = 'none'; }
+  document.getElementById('se-bh').value = bh;
+  document.getElementById('se-bm').value = bm;
+  document.getElementById('se-ah').value = ah;
+  document.getElementById('se-am').value = am;
+  seServiceType = stype;  seVtype = vtype;
+  document.getElementById('se-departure').value   = dep;
+  document.getElementById('se-destination').value = dest;
+  document.getElementById('se-place').value        = place;
+  document.getElementById('se-fee').value          = fee;
+  seUpdateTypeUI(); seUpdateVtypeUI();
   document.getElementById('segEditOverlay').classList.add('show');
 }
 
+// ── 履歴：区間編集 ──
+function openSegEditModal(recordId, segIdx) {
+  const r = records.find(rec => rec.id === recordId);
+  if (!r || !r.segments || !r.segments[segIdx]) return;
+  segEditingRecordId = recordId; segEditingIdx = segIdx;
+  segEditMode = 'edit_record';
+  const s = r.segments[segIdx];
+  seServiceType = s.serviceType || 'taxi';
+  seVtype       = s.vtype       || 'large';
+  seSegDuration = s.duration    || 0;
+  if (s.serviceType === 'taxi') {
+    const baseFare = calcTaxiFee(seSegDuration, s.vtype || 'large', false).fee;
+    seHasExtras = (s.fee || 0) > baseFare;
+  } else { seHasExtras = false; }
+  const bt = new Date(s.boardTime), at = new Date(s.alightTime);
+  seShowModal('✏️ 区間を編集', null,
+    bt.getHours(), bt.getMinutes(), at.getHours(), at.getMinutes(),
+    seServiceType, seVtype,
+    s.departure||'', s.destination||'', s.place||'', s.fee||0);
+}
+
+// ── 履歴：区間挿入 ──
+function openSegInsert(recordId, afterIdx) {
+  const r = records.find(rec => rec.id === recordId);
+  if (!r) return;
+  segEditingRecordId = recordId; segInsertAfterIdx = afterIdx;
+  segEditMode = 'insert_record';
+  const refSeg  = afterIdx >= 0 ? r.segments[afterIdx] : r.segments[0];
+  const refDate = refSeg ? new Date(refSeg.alightTime || refSeg.boardTime)
+                         : new Date(r.savedAt || Date.now());
+  segEditDateRef = refDate;
+  const rh = refDate.getHours(), rm = refDate.getMinutes();
+  const eh = rh, em = Math.min(59, rm + 10);
+  seServiceType = 'taxi'; seVtype = 'large'; seHasExtras = false; seSegDuration = 10;
+  const hint = afterIdx >= 0
+    ? `区間${afterIdx+1}の後ろに挿入されます`
+    : '先頭に挿入されます';
+  seShowModal('➕ 区間を挿入', hint, rh, rm, eh, em, 'taxi', 'large', '', '', '', 0);
+  seRecalcFee();
+}
+
+// ── 記録中：区間編集 ──
+function openRpSegEdit(segIdx) {
+  if (!session || !session.segments[segIdx]) return;
+  const s = session.segments[segIdx];
+  segEditingIdx = segIdx; segEditMode = 'edit_session';
+  seServiceType = s.serviceType || 'taxi';
+  seVtype       = s.vtype       || 'large';
+  seSegDuration = s.duration    || 0;
+  if (s.serviceType === 'taxi') {
+    seHasExtras = (s.fee||0) > calcTaxiFee(seSegDuration, seVtype, false).fee;
+  } else { seHasExtras = false; }
+  const bt = new Date(s.boardTime), at = new Date(s.alightTime);
+  seShowModal('✏️ 区間を編集（記録中）', null,
+    bt.getHours(), bt.getMinutes(), at.getHours(), at.getMinutes(),
+    seServiceType, seVtype,
+    s.departure||'', s.destination||'', s.place||'', s.fee||0);
+}
+
+// ── 記録中：区間挿入 ──
+function openRpSegInsert(afterIdx) {
+  if (!session) return;
+  segInsertAfterIdx = afterIdx; segEditMode = 'insert_session';
+  const refSeg  = afterIdx >= 0 ? session.segments[afterIdx] : null;
+  const refDate = refSeg ? new Date(refSeg.alightTime) : new Date();
+  segEditDateRef = refDate;
+  const rh = refDate.getHours(), rm = refDate.getMinutes();
+  const eh = rh, em = Math.min(59, rm + 10);
+  seServiceType = 'taxi'; seVtype = rpVtype || 'large'; seHasExtras = false; seSegDuration = 10;
+  const hint = afterIdx >= 0
+    ? `区間${afterIdx+1}の後ろに挿入されます`
+    : '先頭に挿入されます';
+  seShowModal('➕ 区間を挿入', hint, rh, rm, eh, em, 'taxi', seVtype, '', '', '', 0);
+  seRecalcFee();
+}
+
 function seRecalcFee() {
+  const bh = parseInt(document.getElementById('se-bh').value) || 0;
+  const bm = parseInt(document.getElementById('se-bm').value) || 0;
+  const ah = parseInt(document.getElementById('se-ah').value) || 0;
+  const am = parseInt(document.getElementById('se-am').value) || 0;
+  seSegDuration = Math.max(1, (ah * 60 + am) - (bh * 60 + bm));
   let fee = 0;
   if (seServiceType === 'taxi') {
     fee = calcTaxiFee(seSegDuration, seVtype, seHasExtras).fee;
@@ -2519,47 +2616,79 @@ function seUpdateVtypeUI() {
 }
 
 function saveSegEdit() {
-  const r = records.find(rec => rec.id === segEditingRecordId);
-  if (!r || !r.segments || !r.segments[segEditingIdx]) return;
-  const s = r.segments[segEditingIdx];
+  const bh  = parseInt(document.getElementById('se-bh').value) || 0;
+  const bm  = parseInt(document.getElementById('se-bm').value) || 0;
+  const ah  = parseInt(document.getElementById('se-ah').value) || 0;
+  const am  = parseInt(document.getElementById('se-am').value) || 0;
+  const fee = parseInt(document.getElementById('se-fee').value) || 0;
+  const dep  = seServiceType === 'taxi' ? document.getElementById('se-departure').value.trim()   : '';
+  const dest = seServiceType === 'taxi' ? document.getElementById('se-destination').value.trim() : '';
+  const plc  = seServiceType !== 'taxi' ? document.getElementById('se-place').value.trim()       : '';
 
-  const bh = parseInt(document.getElementById('se-bh').value) || 0;
-  const bm = parseInt(document.getElementById('se-bm').value) || 0;
-  const ah = parseInt(document.getElementById('se-ah').value) || 0;
-  const am = parseInt(document.getElementById('se-am').value) || 0;
-
-  const bt = new Date(s.boardTime);
-  bt.setHours(bh, bm, 0, 0);
-  const at = new Date(s.alightTime);
-  at.setHours(ah, am, 0, 0);
-  const duration = Math.max(0, Math.round((at - bt) / 60000));
-
-  s.serviceType = seServiceType;
-  s.vtype       = seServiceType === 'taxi' ? seVtype : null;
-  s.boardTime   = bt.toISOString();
-  s.alightTime  = at.toISOString();
-  s.duration    = duration;
-  s.fee         = parseInt(document.getElementById('se-fee').value)       || 0;
-  s.feeEdited   = true;
-
-  if (seServiceType === 'taxi') {
-    s.departure   = document.getElementById('se-departure').value.trim();
-    s.destination = document.getElementById('se-destination').value.trim();
-    s.place = '';
-  } else {
-    s.place       = document.getElementById('se-place').value.trim();
-    s.departure   = '';
-    s.destination = '';
+  function makeTimestamps(refDate) {
+    const bt = new Date(refDate); bt.setHours(bh, bm, 0, 0);
+    const at = new Date(refDate); at.setHours(ah, am, 0, 0);
+    const duration = Math.max(1, Math.round((at - bt) / 60000));
+    return { bt, at, duration };
+  }
+  function applyToSeg(s, bt, at, duration) {
+    s.serviceType = seServiceType;
+    s.vtype       = seServiceType === 'taxi' ? seVtype : null;
+    s.boardTime   = bt.toISOString();
+    s.alightTime  = at.toISOString();
+    s.duration    = duration;
+    s.fee         = fee;
+    s.feeEdited   = true;
+    s.departure   = dep; s.destination = dest; s.place = plc;
   }
 
-  // 合計料金・時間を再計算
-  r.fee      = r.segments.reduce((a, seg) => a + seg.fee, 0);
-  r.duration = r.segments.reduce((a, seg) => a + seg.duration, 0);
+  if (segEditMode === 'edit_record') {
+    const r = records.find(rec => rec.id === segEditingRecordId);
+    if (!r || !r.segments[segEditingIdx]) return;
+    const s = r.segments[segEditingIdx];
+    const { bt, at, duration } = makeTimestamps(new Date(s.boardTime));
+    applyToSeg(s, bt, at, duration);
+    r.fee = r.segments.reduce((a,sg)=>a+sg.fee,0);
+    r.duration = r.segments.reduce((a,sg)=>a+sg.duration,0);
+    persistRecords();
+    document.getElementById('segEditOverlay').classList.remove('show');
+    renderList(); showToast('✅ 区間を更新しました');
 
-  persistRecords();
-  document.getElementById('segEditOverlay').classList.remove('show');
-  renderList();
-  showToast('✅ 区間を更新しました');
+  } else if (segEditMode === 'insert_record') {
+    const r = records.find(rec => rec.id === segEditingRecordId);
+    if (!r) return;
+    const { bt, at, duration } = makeTimestamps(segEditDateRef || new Date(r.savedAt||Date.now()));
+    const newSeg = { serviceType:seServiceType, vtype:seServiceType==='taxi'?seVtype:null,
+      boardTime:bt.toISOString(), alightTime:at.toISOString(), duration, fee, feeEdited:true,
+      departure:dep, destination:dest, place:plc, paxMale:0, paxFemale:0 };
+    r.segments.splice(segInsertAfterIdx + 1, 0, newSeg);
+    r.fee = r.segments.reduce((a,sg)=>a+sg.fee,0);
+    r.duration = r.segments.reduce((a,sg)=>a+sg.duration,0);
+    persistRecords();
+    document.getElementById('segEditOverlay').classList.remove('show');
+    renderList(); showToast('✅ 区間を挿入しました');
+
+  } else if (segEditMode === 'edit_session') {
+    if (!session || !session.segments[segEditingIdx]) return;
+    const s = session.segments[segEditingIdx];
+    const { bt, at, duration } = makeTimestamps(new Date(s.boardTime));
+    applyToSeg(s, bt, at, duration);
+    rpUpdateTotalFee(); renderSegments();
+    document.getElementById('segEditOverlay').classList.remove('show');
+    showToast('✅ 区間を更新しました');
+
+  } else if (segEditMode === 'insert_session') {
+    if (!session) return;
+    const { bt, at, duration } = makeTimestamps(segEditDateRef || new Date());
+    const newSeg = { serviceType:seServiceType, vtype:seServiceType==='taxi'?seVtype:null,
+      boardTime:bt.toISOString(), alightTime:at.toISOString(), duration, fee, feeEdited:true,
+      departure:dep, destination:dest, place:plc, paxMale:0, paxFemale:0 };
+    session.segments.splice(segInsertAfterIdx + 1, 0, newSeg);
+    document.getElementById('btn-complete').disabled = false;
+    rpUpdateTotalFee(); renderSegments();
+    document.getElementById('segEditOverlay').classList.remove('show');
+    showToast('✅ 区間を挿入しました');
+  }
 }
 
 function deleteSegment(recordId, segIdx) {
@@ -2812,7 +2941,8 @@ if ('serviceWorker' in navigator) {
 <div class="confirm-overlay" id="segEditOverlay">
   <div class="confirm-sheet">
     <div class="cs-handle"></div>
-    <div class="cs-title">✏️ 区間を編集</div>
+    <div class="cs-title" id="se-modal-title">✏️ 区間を編集</div>
+    <div id="se-insert-hint" style="display:none;font-size:12px;color:var(--primary);background:var(--primary-light);border-radius:6px;padding:6px 10px;margin-bottom:10px;"></div>
 
     <div style="margin-bottom:12px;">
       <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:6px;display:block;">サービス種別</label>
@@ -2835,15 +2965,15 @@ if ('serviceWorker' in navigator) {
       <div style="flex:1;">
         <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">乗車時刻</label>
         <div style="display:flex;gap:4px;align-items:center;">
-          <input type="number" id="se-bh" min="0" max="23" style="width:52px;text-align:center;"> 時
-          <input type="number" id="se-bm" min="0" max="59" style="width:52px;text-align:center;"> 分
+          <input type="number" id="se-bh" min="0" max="23" oninput="seRecalcFee()" style="width:52px;text-align:center;"> 時
+          <input type="number" id="se-bm" min="0" max="59" oninput="seRecalcFee()" style="width:52px;text-align:center;"> 分
         </div>
       </div>
       <div style="flex:1;">
         <label style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:5px;display:block;">下車時刻</label>
         <div style="display:flex;gap:4px;align-items:center;">
-          <input type="number" id="se-ah" min="0" max="23" style="width:52px;text-align:center;"> 時
-          <input type="number" id="se-am" min="0" max="59" style="width:52px;text-align:center;"> 分
+          <input type="number" id="se-ah" min="0" max="23" oninput="seRecalcFee()" style="width:52px;text-align:center;"> 時
+          <input type="number" id="se-am" min="0" max="59" oninput="seRecalcFee()" style="width:52px;text-align:center;"> 分
         </div>
       </div>
     </div>
