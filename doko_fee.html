@@ -21,6 +21,8 @@
       --kyuen-bg: #f3e5f5;
       --taiki: #e65100;
       --taiki-bg: #fff3e0;
+      --tatekae: #00838f;
+      --tatekae-bg: #e0f7fa;
       --text: #212121;
       --text-sub: #757575;
       --bg: #f0f4f3;
@@ -508,6 +510,9 @@
   <button class="tab-btn" onclick="switchTab('odo')" id="tab-odo">
     <span class="icon">&#128663;</span>出退庫
   </button>
+  <button class="tab-btn" onclick="switchTab('tatekae')" id="tab-tatekae">
+    <span class="icon">&#129534;</span>立替
+  </button>
   <button class="tab-btn" onclick="switchTab('settings')" id="tab-settings">
     <span class="icon">&#9881;&#65039;</span>設定
   </button>
@@ -902,6 +907,139 @@
   </div>
 </div>
 
+<!-- ═══════════════════════
+     TAB: 立替金
+═══════════════════════ -->
+<div class="tab-panel" id="panel-tatekae">
+  <div class="content">
+
+    <div class="card">
+      <div class="card-title">&#129534; レシートを追加する</div>
+      <p style="font-size:12px;color:var(--text-sub);margin-top:-6px;margin-bottom:12px;">
+        写真を撮って、金額を入れるだけでリストに増えるでござる。写真は証拠として保存され、金額はご自身の目で確認してから入れるので安心でござる。
+      </p>
+
+      <div class="form-group">
+        <label>レシートの写真（任意）</label>
+        <button type="button" onclick="document.getElementById('tkPhotoInput').click()"
+          style="width:100%;padding:14px;border:2px dashed var(--tatekae);border-radius:10px;
+                 background:var(--tatekae-bg);color:var(--tatekae);font-size:15px;font-weight:700;cursor:pointer;">
+          &#128247; 写真を撮る・選ぶ
+        </button>
+        <div id="tk-photo-preview" style="display:none;margin-top:8px;position:relative;max-width:160px;">
+          <img id="tk-photo-preview-img" src="" style="width:100%;border-radius:8px;border:1.5px solid var(--border);display:block;">
+          <button type="button" onclick="clearTkPhoto()"
+            style="position:absolute;top:-8px;right:-8px;width:26px;height:26px;border-radius:50%;
+                   background:var(--danger);color:white;border:none;font-size:14px;cursor:pointer;">&#10005;</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>お客様名</label>
+        <input type="text" id="tk-customer" list="tk-customer-list" placeholder="例：矢島 瑞枝">
+        <datalist id="tk-customer-list"></datalist>
+      </div>
+      <div class="form-group">
+        <label>日付</label>
+        <input type="date" id="tk-date">
+      </div>
+      <div class="form-group">
+        <label>店名</label>
+        <input type="text" id="tk-store" list="tk-store-list" placeholder="例：ニトリ 小田原店">
+        <datalist id="tk-store-list"></datalist>
+      </div>
+      <div class="form-group">
+        <label>金額（円）</label>
+        <input type="number" id="tk-amount" min="0" step="1" placeholder="例：1500"
+          style="font-size:24px;font-weight:800;">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>内容・備考（任意）</label>
+        <input type="text" id="tk-memo" placeholder="例：日用品・昼食など">
+      </div>
+      <button class="btn btn-primary" onclick="saveTatekae()" style="margin-top:14px;background:var(--tatekae);">
+        &#9989; リストに追加する
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">&#128197; 月ごとのリスト</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <select id="tk-filter-customer" onchange="renderTatekaeList()">
+          <option value="">（お客様を選ぶ）</option>
+        </select>
+        <input type="month" id="tk-filter-month" onchange="renderTatekaeList()">
+      </div>
+
+      <div class="summary-bar">
+        <div class="summary-item"><div class="s-val" id="tk-s-count">0</div><div class="s-lbl">件</div></div>
+        <div class="summary-item"><div class="s-val" id="tk-s-total">¥0</div><div class="s-lbl">合計金額</div></div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:12px 0;">
+        <span id="tk-closed-badge" style="font-size:13px;font-weight:700;color:var(--text-sub);"></span>
+        <button type="button" id="tk-closed-btn" onclick="toggleTatekaeClosed()"
+          style="padding:9px 14px;border-radius:8px;border:1.5px solid var(--tatekae);background:white;
+                 color:var(--tatekae);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">
+          &#128274; この月を確定する
+        </button>
+      </div>
+
+      <div id="tatekaeList"></div>
+
+      <button class="btn btn-outline" onclick="printTatekaeStatement()" style="margin-top:14px;">
+        &#128424;&#65039; 立替金明細書を見る（印刷・PDF保存）
+      </button>
+      <button class="btn btn-outline" onclick="exportTatekaeCSV()" style="margin-top:0;">
+        &#128229; 全データをExcel用に書き出す
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- hidden receipt camera input -->
+<input type="file" id="tkPhotoInput" accept="image/*" capture="environment"
+  style="display:none;" onchange="onTkPhoto(event)">
+
+<!-- 立替レシート 写真拡大表示 -->
+<div id="tkPhotoViewOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);
+  z-index:600;align-items:center;justify-content:center;padding:20px;" onclick="closeTkPhotoView()">
+  <img id="tkPhotoViewImg" src="" style="max-width:100%;max-height:90vh;border-radius:8px;">
+</div>
+
+<!-- 立替 編集モーダル -->
+<div id="tkEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+  z-index:600;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:14px;width:100%;max-width:400px;padding:18px;max-height:90vh;overflow-y:auto;">
+    <div style="font-size:15px;font-weight:800;color:var(--tatekae);margin-bottom:12px;">&#9999;&#65039; レシートを編集</div>
+    <div class="form-group">
+      <label>お客様名</label>
+      <input type="text" id="tke-customer">
+    </div>
+    <div class="form-group">
+      <label>日付</label>
+      <input type="date" id="tke-date">
+    </div>
+    <div class="form-group">
+      <label>店名</label>
+      <input type="text" id="tke-store">
+    </div>
+    <div class="form-group">
+      <label>金額（円）</label>
+      <input type="number" id="tke-amount" min="0" step="1" style="font-size:22px;font-weight:800;">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label>内容・備考</label>
+      <input type="text" id="tke-memo">
+    </div>
+    <button class="btn btn-primary" onclick="saveTkEdit()" style="margin-top:14px;background:var(--tatekae);">&#9989; 保存する</button>
+    <button onclick="closeTkEditModal()"
+      style="display:block;width:100%;padding:12px;margin-top:8px;background:none;border:1.5px solid var(--border);
+             border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;color:var(--text-sub);">キャンセル</button>
+  </div>
+</div>
+
 <div class="tab-panel" id="panel-settings">
   <div class="content">
 
@@ -919,6 +1057,28 @@
         記録開始時のデフォルト車種として使われます
       </p>
       <button class="btn btn-primary" onclick="saveSettingsUI()" style="margin-top:14px;margin-bottom:0;">
+        &#128190; 設定を保存
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">&#129534; 立替金明細書の設定</div>
+      <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px;">
+        「立替」タブで作る明細書の下に印刷される情報でござる
+      </p>
+      <div class="form-group">
+        <label>事業所名</label>
+        <input type="text" id="set-biz-name" placeholder="例：生活サポートゆるり">
+      </div>
+      <div class="form-group">
+        <label>担当者名</label>
+        <input type="text" id="set-biz-staff" placeholder="例：熊木　志津乃">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>電話番号</label>
+        <input type="text" id="set-biz-phone" placeholder="例：080-6993-1212">
+      </div>
+      <button class="btn btn-primary" onclick="saveSettingsUI()" style="margin-top:14px;margin-bottom:0;background:var(--tatekae);">
         &#128190; 設定を保存
       </button>
     </div>
@@ -1192,6 +1352,16 @@ const ODO_VEHICLES = [
   { key: 'tanto',    name: 'タント',         emoji: '🚗' },
 ];
 
+let tatekaeRecords = []; // [{id, customer, date, store, amount, memo, photo, createdAt}]
+let tatekaeClosed  = {}; // { 'お客様名|YYYY-MM': true }
+let tkPendingPhoto  = null; // 圧縮後の写真データURL（保存前の一時保管）
+const SETTINGS_DEFAULTS = {
+  defaultVtype: 'large',
+  bizName:  '生活サポートゆるり',
+  bizStaff: '熊木　志津乃',
+  bizPhone: '080-6993-1212',
+};
+
 // ══════════════════════════════════════
 //  Init
 // ══════════════════════════════════════
@@ -1202,21 +1372,28 @@ const ODO_VEHICLES = [
   renderSettingsUI();
   renderList();
   renderOdoTab();
+  renderTatekaeTab();
 })();
 
 function loadData() {
   try {
     const s = localStorage.getItem('doko_settings');
-    if (s) settings = Object.assign({ defaultVtype: 'large' }, JSON.parse(s));
+    settings = Object.assign({}, SETTINGS_DEFAULTS, s ? JSON.parse(s) : {});
     const r = localStorage.getItem('doko_records');
     if (r) records = JSON.parse(r);
     const o = localStorage.getItem('doko_odo');
     if (o) odoRecords = JSON.parse(o);
+    const t = localStorage.getItem('doko_tatekae');
+    if (t) tatekaeRecords = JSON.parse(t);
+    const tc = localStorage.getItem('doko_tatekae_closed');
+    if (tc) tatekaeClosed = JSON.parse(tc);
   } catch(e) {}
 }
-function persistSettings() { localStorage.setItem('doko_settings', JSON.stringify(settings)); }
-function persistRecords()  { localStorage.setItem('doko_records',  JSON.stringify(records));  }
-function persistOdo()      { localStorage.setItem('doko_odo',      JSON.stringify(odoRecords)); }
+function persistSettings()     { localStorage.setItem('doko_settings', JSON.stringify(settings)); }
+function persistRecords()      { localStorage.setItem('doko_records',  JSON.stringify(records));  }
+function persistOdo()          { localStorage.setItem('doko_odo',      JSON.stringify(odoRecords)); }
+function persistTatekae()      { localStorage.setItem('doko_tatekae',        JSON.stringify(tatekaeRecords)); }
+function persistTatekaeClosed(){ localStorage.setItem('doko_tatekae_closed', JSON.stringify(tatekaeClosed));  }
 
 // ══════════════════════════════════════
 //  出退庫
@@ -1582,8 +1759,9 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
-  if (tab === 'list') renderList();
-  if (tab === 'odo')  renderOdoTab();
+  if (tab === 'list')    renderList();
+  if (tab === 'odo')     renderOdoTab();
+  if (tab === 'tatekae') renderTatekaeTab();
 }
 
 // ══════════════════════════════════════
@@ -2891,6 +3069,334 @@ function closeInvoice() {
 }
 
 // ══════════════════════════════════════
+//  立替金（お客様への立替え・レシート記録）
+// ══════════════════════════════════════
+function todayStrTk() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function currentMonthStrTk() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+}
+function getTatekaeCustomers() {
+  const set = new Set();
+  tatekaeRecords.forEach(t => { if (t.customer) set.add(t.customer); });
+  records.forEach(r => { if (r.customer) set.add(r.customer); });
+  return Array.from(set).sort((a,b) => a.localeCompare(b, 'ja'));
+}
+function getTatekaeStores() {
+  const set = new Set();
+  tatekaeRecords.forEach(t => { if (t.store) set.add(t.store); });
+  return Array.from(set).sort((a,b) => a.localeCompare(b, 'ja'));
+}
+
+function renderTatekaeTab() {
+  if (!document.getElementById('tk-date').value) {
+    document.getElementById('tk-date').value = todayStrTk();
+  }
+
+  document.getElementById('tk-customer-list').innerHTML =
+    getTatekaeCustomers().map(c => `<option value="${escHtml(c)}">`).join('');
+  document.getElementById('tk-store-list').innerHTML =
+    getTatekaeStores().map(s => `<option value="${escHtml(s)}">`).join('');
+
+  const sel = document.getElementById('tk-filter-customer');
+  const prevVal = sel.value;
+  const customers = getTatekaeCustomers();
+  sel.innerHTML = '<option value="">（お客様を選ぶ）</option>' +
+    customers.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  sel.value = customers.includes(prevVal) ? prevVal : (customers[0] || '');
+
+  if (!document.getElementById('tk-filter-month').value) {
+    document.getElementById('tk-filter-month').value = currentMonthStrTk();
+  }
+
+  renderTatekaeList();
+}
+
+function onTkPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 900;
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      tkPendingPhoto = canvas.toDataURL('image/jpeg', 0.65);
+      document.getElementById('tk-photo-preview-img').src = tkPendingPhoto;
+      document.getElementById('tk-photo-preview').style.display = 'block';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function clearTkPhoto() {
+  tkPendingPhoto = null;
+  document.getElementById('tkPhotoInput').value = '';
+  document.getElementById('tk-photo-preview').style.display = 'none';
+  document.getElementById('tk-photo-preview-img').src = '';
+}
+
+function saveTatekae() {
+  const customer = document.getElementById('tk-customer').value.trim();
+  const date     = document.getElementById('tk-date').value || todayStrTk();
+  const store    = document.getElementById('tk-store').value.trim();
+  const amount   = parseInt(document.getElementById('tk-amount').value, 10);
+  const memo     = document.getElementById('tk-memo').value.trim();
+
+  if (!customer) { showToast('お客様名を入れてください'); return; }
+  if (!amount || amount <= 0) { showToast('金額を入れてください'); return; }
+
+  const monthKey  = date.slice(0, 7);
+  const closedKey = customer + '|' + monthKey;
+  if (tatekaeClosed[closedKey]) {
+    if (!confirm(`${customer}様の${monthKey}分は確定済みでござる。それでも追加するでござるか？`)) return;
+  }
+
+  tatekaeRecords.push({
+    id: 'tk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+    customer, date, store, amount, memo,
+    photo: tkPendingPhoto,
+    createdAt: new Date().toISOString(),
+  });
+  persistTatekae();
+
+  document.getElementById('tk-store').value  = '';
+  document.getElementById('tk-amount').value = '';
+  document.getElementById('tk-memo').value   = '';
+  clearTkPhoto();
+
+  document.getElementById('tk-filter-customer').value = customer;
+  document.getElementById('tk-filter-month').value    = monthKey;
+
+  renderTatekaeTab();
+  showToast(`✅ 追加しました（¥${amount.toLocaleString()}）`);
+}
+
+function formatDateLabelTk(dateStr) {
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  } catch (e) { return dateStr; }
+}
+
+function renderTatekaeList() {
+  const customer = document.getElementById('tk-filter-customer').value;
+  const month    = document.getElementById('tk-filter-month').value; // 'YYYY-MM'
+  const listEl   = document.getElementById('tatekaeList');
+  const badgeEl  = document.getElementById('tk-closed-badge');
+  const btnEl    = document.getElementById('tk-closed-btn');
+
+  if (!customer || !month) {
+    listEl.innerHTML = '<div class="empty-state"><div class="e-icon">🧾</div>お客様と月を選ぶと、ここにリストが出るでござる</div>';
+    document.getElementById('tk-s-count').textContent = '0';
+    document.getElementById('tk-s-total').textContent = '¥0';
+    badgeEl.textContent = '';
+    btnEl.style.display = 'none';
+    return;
+  }
+  btnEl.style.display = 'inline-block';
+
+  const items = tatekaeRecords
+    .filter(t => t.customer === customer && t.date && t.date.slice(0, 7) === month)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const total = items.reduce((a, t) => a + t.amount, 0);
+  document.getElementById('tk-s-count').textContent = items.length;
+  document.getElementById('tk-s-total').textContent = '¥' + total.toLocaleString();
+
+  const closedKey = customer + '|' + month;
+  const isClosed  = !!tatekaeClosed[closedKey];
+  badgeEl.textContent = isClosed ? '🔒 この月は確定済み' : '📝 未確定（まだ追加できます）';
+  btnEl.innerHTML = isClosed ? '&#128275; 確定を取り消す' : '&#128274; この月を確定する';
+
+  if (items.length === 0) {
+    listEl.innerHTML = '<div class="empty-state"><div class="e-icon">🧾</div>この月のレシートはまだありません</div>';
+    return;
+  }
+
+  listEl.innerHTML = items.map(t => `
+    <div class="card" style="padding:12px;margin-bottom:8px;">
+      <div style="display:flex;gap:10px;">
+        ${t.photo
+          ? `<img src="${t.photo}" onclick="viewTkPhoto('${t.id}')" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);cursor:pointer;flex-shrink:0;">`
+          : `<div style="width:52px;height:52px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🧾</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+            <span style="font-size:13px;color:var(--text-sub);">${formatDateLabelTk(t.date)}</span>
+            <span style="font-size:17px;font-weight:800;color:var(--tatekae);">¥${t.amount.toLocaleString()}</span>
+          </div>
+          <div style="font-size:14px;font-weight:700;margin-top:2px;">${escHtml(t.store || '（店名なし）')}</div>
+          ${t.memo ? `<div style="font-size:12px;color:var(--text-sub);margin-top:2px;">${escHtml(t.memo)}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0;">
+          <button onclick="openTkEditModal('${t.id}')" style="background:none;border:none;font-size:15px;cursor:pointer;color:var(--primary);padding:4px;" title="編集">✏️</button>
+          <button onclick="deleteTatekae('${t.id}')" style="background:none;border:none;font-size:15px;cursor:pointer;color:var(--danger);padding:4px;" title="削除">🗑️</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleTatekaeClosed() {
+  const customer = document.getElementById('tk-filter-customer').value;
+  const month    = document.getElementById('tk-filter-month').value;
+  if (!customer || !month) return;
+  const key = customer + '|' + month;
+  if (tatekaeClosed[key]) {
+    delete tatekaeClosed[key];
+    showToast('確定を取り消しました');
+  } else {
+    if (!confirm(`${customer}様の${month}分を確定（締め）にするでござるか？`)) return;
+    tatekaeClosed[key] = true;
+    showToast('✅ この月を確定したでござる');
+  }
+  persistTatekaeClosed();
+  renderTatekaeList();
+}
+
+function deleteTatekae(id) {
+  if (!confirm('このレシートを削除します。元に戻せません。')) return;
+  tatekaeRecords = tatekaeRecords.filter(t => t.id !== id);
+  persistTatekae();
+  renderTatekaeTab();
+  showToast('削除しました');
+}
+
+function viewTkPhoto(id) {
+  const t = tatekaeRecords.find(x => x.id === id);
+  if (!t || !t.photo) return;
+  document.getElementById('tkPhotoViewImg').src = t.photo;
+  document.getElementById('tkPhotoViewOverlay').style.display = 'flex';
+}
+function closeTkPhotoView() {
+  document.getElementById('tkPhotoViewOverlay').style.display = 'none';
+  document.getElementById('tkPhotoViewImg').src = '';
+}
+
+let tkEditingId = null;
+function openTkEditModal(id) {
+  const t = tatekaeRecords.find(x => x.id === id);
+  if (!t) return;
+  tkEditingId = id;
+  document.getElementById('tke-customer').value = t.customer;
+  document.getElementById('tke-date').value     = t.date;
+  document.getElementById('tke-store').value    = t.store || '';
+  document.getElementById('tke-amount').value   = t.amount;
+  document.getElementById('tke-memo').value     = t.memo || '';
+  document.getElementById('tkEditOverlay').style.display = 'flex';
+}
+function closeTkEditModal() {
+  document.getElementById('tkEditOverlay').style.display = 'none';
+  tkEditingId = null;
+}
+function saveTkEdit() {
+  const t = tatekaeRecords.find(x => x.id === tkEditingId);
+  if (!t) return;
+  const customer = document.getElementById('tke-customer').value.trim();
+  const amount   = parseInt(document.getElementById('tke-amount').value, 10);
+  if (!customer) { showToast('お客様名を入れてください'); return; }
+  if (!amount || amount <= 0) { showToast('金額を入れてください'); return; }
+  t.customer = customer;
+  t.date     = document.getElementById('tke-date').value || t.date;
+  t.store    = document.getElementById('tke-store').value.trim();
+  t.amount   = amount;
+  t.memo     = document.getElementById('tke-memo').value.trim();
+  persistTatekae();
+  closeTkEditModal();
+  renderTatekaeTab();
+  showToast('✅ 修正しました');
+}
+
+function reiwaLabelTk(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number);
+  return `令和${y - 2018}年${m}月分`;
+}
+function printTatekaeStatement() {
+  const customer = document.getElementById('tk-filter-customer').value;
+  const month    = document.getElementById('tk-filter-month').value;
+  if (!customer || !month) { showToast('お客様と月を選んでください'); return; }
+
+  const items = tatekaeRecords
+    .filter(t => t.customer === customer && t.date && t.date.slice(0, 7) === month)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (items.length === 0) { showToast('この月のレシートがありません'); return; }
+
+  const total = items.reduce((a, t) => a + t.amount, 0);
+  const rows = items.map(t => `
+    <tr>
+      <td style="padding:9px 10px;border-bottom:1px solid #eee;font-size:14px;white-space:nowrap;">${t.date.replace(/-/g, '/')}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #eee;font-size:14px;">${escHtml(t.store || '')}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #eee;font-size:14px;">${escHtml(t.memo || '')}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #eee;font-size:14px;text-align:right;font-weight:700;">¥${t.amount.toLocaleString()}</td>
+    </tr>`).join('');
+
+  const bodyHtml = `
+  <h1 style="font-size:24px;font-weight:800;letter-spacing:4px;text-align:center;margin-bottom:24px;">立替金明細書</h1>
+  <div style="font-size:20px;font-weight:800;border-bottom:2px solid #212121;padding-bottom:4px;display:inline-block;margin-bottom:10px;">${escHtml(customer)} 様</div>
+  <p style="font-size:14px;color:#555;margin-bottom:22px;">${reiwaLabelTk(month)}　下記のとおりお立替えいたしました。</p>
+
+  <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+    <thead>
+      <tr style="background:#f5f5f5;">
+        <th style="padding:10px;font-size:12px;font-weight:700;color:#555;text-align:left;border-bottom:2px solid #ddd;width:90px;">日付</th>
+        <th style="padding:10px;font-size:12px;font-weight:700;color:#555;text-align:left;border-bottom:2px solid #ddd;">店名</th>
+        <th style="padding:10px;font-size:12px;font-weight:700;color:#555;text-align:left;border-bottom:2px solid #ddd;">内容</th>
+        <th style="padding:10px;font-size:12px;font-weight:700;color:#555;text-align:right;border-bottom:2px solid #ddd;width:100px;">金額（円）</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr style="background:#e0f7fa;">
+        <td colspan="2" style="padding:10px;font-size:15px;font-weight:800;">合計</td>
+        <td style="padding:10px;font-size:13px;color:#555;text-align:right;">${items.length}件</td>
+        <td style="padding:10px;font-size:16px;font-weight:800;text-align:right;color:#00695c;">¥${total.toLocaleString()}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div style="text-align:center;font-size:13px;color:#555;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">
+    ${escHtml(settings.bizName || '')}<br>
+    ${escHtml(settings.bizStaff || '')}<br>
+    ${settings.bizPhone ? 'TEL：' + escHtml(settings.bizPhone) : ''}
+  </div>`;
+
+  document.getElementById('invoiceBody').innerHTML = bodyHtml;
+  const overlay = document.getElementById('invoiceOverlay');
+  overlay.style.display = 'block';
+  overlay.scrollTop = 0;
+}
+
+function exportTatekaeCSV() {
+  if (tatekaeRecords.length === 0) { showToast('データがありません'); return; }
+  const header = ['お客様名', '日付', '店名', '金額', '内容・備考'];
+  const rows = tatekaeRecords
+    .slice()
+    .sort((a, b) => (a.customer + a.date).localeCompare(b.customer + b.date))
+    .map(t => [t.customer, t.date, t.store || '', t.amount, t.memo || '']);
+  const csvLines = [header, ...rows].map(cols =>
+    cols.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+  );
+  const csv  = '﻿' + csvLines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const today = new Date();
+  a.href = url;
+  a.download = `立替金_${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ 書き出しました');
+}
+
+// ══════════════════════════════════════
 //  Settings
 // ══════════════════════════════════════
 function setDefaultVtype(vtype) {
@@ -2900,8 +3406,14 @@ function setDefaultVtype(vtype) {
 }
 function renderSettingsUI() {
   setDefaultVtype(settings.defaultVtype || 'large');
+  document.getElementById('set-biz-name').value  = settings.bizName  || '';
+  document.getElementById('set-biz-staff').value = settings.bizStaff || '';
+  document.getElementById('set-biz-phone').value = settings.bizPhone || '';
 }
 function saveSettingsUI() {
+  settings.bizName  = document.getElementById('set-biz-name').value.trim();
+  settings.bizStaff = document.getElementById('set-biz-staff').value.trim();
+  settings.bizPhone = document.getElementById('set-biz-phone').value.trim();
   persistSettings();
   showToast('✅ 設定を保存しました');
 }
