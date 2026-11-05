@@ -932,6 +932,7 @@
             style="position:absolute;top:-8px;right:-8px;width:26px;height:26px;border-radius:50%;
                    background:var(--danger);color:white;border:none;font-size:14px;cursor:pointer;">&#10005;</button>
         </div>
+        <div id="tk-ocr-status" style="display:none;margin-top:8px;font-size:12px;color:var(--tatekae);font-weight:700;"></div>
       </div>
 
       <div class="form-group">
@@ -3132,6 +3133,7 @@ function onTkPhoto(event) {
       tkPendingPhoto = canvas.toDataURL('image/jpeg', 0.65);
       document.getElementById('tk-photo-preview-img').src = tkPendingPhoto;
       document.getElementById('tk-photo-preview').style.display = 'block';
+      runTkOcr(tkPendingPhoto);
     };
     img.src = e.target.result;
   };
@@ -3142,6 +3144,116 @@ function clearTkPhoto() {
   document.getElementById('tkPhotoInput').value = '';
   document.getElementById('tk-photo-preview').style.display = 'none';
   document.getElementById('tk-photo-preview-img').src = '';
+  const statusEl = document.getElementById('tk-ocr-status');
+  statusEl.style.display = 'none';
+  statusEl.textContent = '';
+}
+
+// ── レシート写真を自動で読み取る（金額・日付・店名） ──
+function runTkOcr(dataUrl) {
+  const statusEl = document.getElementById('tk-ocr-status');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '🔍 写真を読み取り中…（はじめては少し時間がかかるでござる）';
+
+  if (typeof Tesseract === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    script.onload = () => doTkOcr(dataUrl);
+    script.onerror = () => {
+      statusEl.textContent = '⚠️ オフラインのため自動で読み取れません。手入力してください。';
+    };
+    document.head.appendChild(script);
+  } else {
+    doTkOcr(dataUrl);
+  }
+}
+
+async function doTkOcr(dataUrl) {
+  const statusEl = document.getElementById('tk-ocr-status');
+  // 写真を撮り直した時に、古い読み取り結果を上書きしないようにする
+  const myPhoto = dataUrl;
+  try {
+    const worker = await Tesseract.createWorker('jpn+eng');
+    const { data: { text } } = await worker.recognize(dataUrl);
+    await worker.terminate();
+
+    if (tkPendingPhoto !== myPhoto) return; // 読み取り中に写真が変わっていたら無視
+
+    const result = parseReceiptText(text);
+    const filled = [];
+
+    if (result.amount) {
+      document.getElementById('tk-amount').value = result.amount;
+      filled.push('金額');
+    }
+    if (result.date) {
+      document.getElementById('tk-date').value = result.date;
+      filled.push('日付');
+    }
+    if (result.store && !document.getElementById('tk-store').value.trim()) {
+      document.getElementById('tk-store').value = result.store;
+      filled.push('店名');
+    }
+
+    if (filled.length > 0) {
+      statusEl.textContent = `✅ ${filled.join('・')}を読み取ったでござる。内容を確認してね`;
+    } else {
+      statusEl.textContent = '⚠️ うまく読み取れなかったでござる。金額などを手入力してね';
+    }
+  } catch (e) {
+    if (tkPendingPhoto !== myPhoto) return;
+    statusEl.textContent = '⚠️ 読み取りに失敗したでござる。金額などを手入力してね';
+  }
+}
+
+function parseReceiptText(text) {
+  const result = { amount: null, date: null, store: null };
+  if (!text) return result;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // ── 金額：「合計」などの行を優先して探す ──
+  const totalLineRe = /(合計|ご合計|お会計|総額|お買上|total)[^\d]*([\d,]{2,8})/i;
+  for (const line of lines) {
+    const m = line.match(totalLineRe);
+    if (m) {
+      const n = parseInt(m[2].replace(/,/g, ''), 10);
+      if (n > 0) { result.amount = n; break; }
+    }
+  }
+  if (!result.amount) {
+    // 「合計」が読み取れない時は、レシート内の金額らしき数字のうち一番大きいものを使う
+    const nums = [];
+    const numRe = /[\d][\d,]{1,7}/g;
+    let m2;
+    while ((m2 = numRe.exec(text)) !== null) {
+      const n = parseInt(m2[0].replace(/,/g, ''), 10);
+      if (n >= 10 && n <= 999999) nums.push(n);
+    }
+    if (nums.length > 0) result.amount = Math.max(...nums);
+  }
+
+  // ── 日付：2026/10/02 や 令和8年10月2日 のような形を探す ──
+  let dm = text.match(/(20\d{2})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+  if (dm) {
+    result.date = `${dm[1]}-${String(dm[2]).padStart(2, '0')}-${String(dm[3]).padStart(2, '0')}`;
+  } else {
+    dm = text.match(/令和(\d{1,2})年(\d{1,2})月(\d{1,2})日/);
+    if (dm) {
+      const y = 2018 + parseInt(dm[1], 10);
+      result.date = `${y}-${String(dm[2]).padStart(2, '0')}-${String(dm[3]).padStart(2, '0')}`;
+    }
+  }
+
+  // ── 店名：数字・記号だけでない、それらしい最初の行を店名とみなす ──
+  for (const line of lines) {
+    const lettersOnly = line.replace(/[0-9\s\-\/:：。、.,¥\\~〜*＊]/g, '');
+    if (lettersOnly.length >= 2 && line.length <= 24) {
+      result.store = line;
+      break;
+    }
+  }
+
+  return result;
 }
 
 function saveTatekae() {
