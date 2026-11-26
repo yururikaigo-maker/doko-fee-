@@ -830,6 +830,8 @@
               onclick="odoDepartSelectVehicle('vellfire')">&#128656; ヴェルファイア</button>
             <button type="button" class="cs-vtype-btn" id="odo-depart-tanto"
               onclick="odoDepartSelectVehicle('tanto')">&#128663; タント</button>
+            <button type="button" class="cs-vtype-btn" id="odo-depart-every"
+              onclick="odoDepartSelectVehicle('every')">&#128667; エブリィワゴン</button>
           </div>
         </div>
         <div class="form-group">
@@ -1190,6 +1192,7 @@ let odoArriveVehicle = 'vellfire';
 const ODO_VEHICLES = [
   { key: 'vellfire', name: 'ヴェルファイア', emoji: '🚐' },
   { key: 'tanto',    name: 'タント',         emoji: '🚗' },
+  { key: 'every',    name: 'エブリィワゴン', emoji: '🚙' },
 ];
 
 // ══════════════════════════════════════
@@ -1238,8 +1241,9 @@ function odoGetRec(today, vehicleKey) {
 
 function odoDepartSelectVehicle(v) {
   odoDepartVehicle = v;
-  ['vf','tanto'].forEach(id => {
-    const key = id === 'vf' ? 'vellfire' : 'tanto';
+  const idMap = { vf: 'vellfire', tanto: 'tanto', every: 'every' };
+  Object.keys(idMap).forEach(id => {
+    const key = idMap[id];
     const btn = document.getElementById('odo-depart-' + id);
     if (btn) btn.className = 'cs-vtype-btn' + (v === key ? ' sel' : '');
   });
@@ -1295,8 +1299,10 @@ function renderOdoTab() {
     // 既に出庫済の車両ボタンを無効化
     const vfBtn    = document.getElementById('odo-depart-vf');
     const tantoBtn = document.getElementById('odo-depart-tanto');
+    const everyBtn = document.getElementById('odo-depart-every');
     if (vfBtn)    { vfBtn.disabled    = !!recs.vellfire; vfBtn.style.opacity    = recs.vellfire ? '0.35' : '1'; }
     if (tantoBtn) { tantoBtn.disabled = !!recs.tanto;    tantoBtn.style.opacity = recs.tanto    ? '0.35' : '1'; }
+    if (everyBtn) { everyBtn.disabled = !!recs.every;    everyBtn.style.opacity = recs.every    ? '0.35' : '1'; }
     // デフォルト：未出庫の最初の車両
     const first = ODO_VEHICLES.find(v => !recs[v.key]);
     if (first) odoDepartVehicle = first.key;
